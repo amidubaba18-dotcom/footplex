@@ -10,7 +10,6 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@g-loot/react-tournament-brackets": "^1.0.31-rc",
     "axios": "^1.16.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
