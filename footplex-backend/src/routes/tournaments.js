@@ -652,6 +652,40 @@ export default async function tournamentRoutes(app) {
         return reply.status(201).send({ message: result.rows[0] })
     })
 
+
+    // POST /:id/teams/request — public team request (no auth required)
+app.post('/:id/teams/request', async (request, reply) => {
+  const { name, contact_name, contact_email } = request.body
+  const tournament_id = parseInt(request.params.id)
+
+  if (!name?.trim()) return reply.status(400).send({ error: 'Team name is required' })
+
+  const tournament = await pool.query('SELECT * FROM tournaments WHERE id=$1', [tournament_id])
+  if (tournament.rows.length === 0) return reply.status(404).send({ error: 'Tournament not found' })
+
+  const t = tournament.rows[0]
+  if (t.status === 'draft') return reply.status(400).send({ error: 'Tournament not open yet' })
+
+  const existingTeams = await pool.query(
+    'SELECT COUNT(*) as cnt FROM teams WHERE tournament_id=$1 AND status IN ($2,$3)',
+    [tournament_id, 'confirmed', 'pending']
+  )
+  if (parseInt(existingTeams.rows[0].cnt) >= t.max_teams) {
+    return reply.status(400).send({ error: 'Tournament is full' })
+  }
+
+  const result = await pool.query(
+    `INSERT INTO teams (tournament_id, name, contact_name, contact_email, status)
+     VALUES ($1,$2,$3,$4,'pending') RETURNING *`,
+    [tournament_id, name.trim(), contact_name?.trim() || null, contact_email?.trim() || null]
+  )
+
+  return reply.status(201).send({ 
+    team: result.rows[0],
+    message: 'Team request submitted! Organizer will review and approve.'
+  })
+})
+
     // ── GET ONE TOURNAMENT BY SLUG — must be LAST ──────
     app.get('/:slug', async (request, reply) => {
         const result = await pool.query(
