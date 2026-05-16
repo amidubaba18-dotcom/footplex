@@ -108,8 +108,8 @@ function BracketView({ fixtures, tournament }) {
                         return (
                             <div key={round} className="flex flex-col gap-2">
                                 <div className={`text-center mb-3 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wide ${isFinal
-                                        ? 'bg-yellow-400 text-yellow-900'
-                                        : 'bg-gray-100 text-gray-500'
+                                    ? 'bg-yellow-400 text-yellow-900'
+                                    : 'bg-gray-100 text-gray-500'
                                     }`}>
                                     {getRoundName(round)}
                                 </div>
@@ -129,8 +129,8 @@ function BracketView({ fixtures, tournament }) {
                                                 <div className={`flex items-center justify-between px-3 py-2.5 border-b ${homeWon ? 'bg-brand-50 border-brand-100' : 'border-gray-100'
                                                     }`}>
                                                     <span className={`text-sm truncate flex-1 ${isTBD ? 'text-gray-300 italic' :
-                                                            homeWon ? 'font-bold text-brand-600' :
-                                                                isDone ? 'text-gray-400' : 'font-medium text-gray-900'
+                                                        homeWon ? 'font-bold text-brand-600' :
+                                                            isDone ? 'text-gray-400' : 'font-medium text-gray-900'
                                                         }`}>
                                                         {match.home_team_name || 'TBD'}
                                                     </span>
@@ -148,8 +148,8 @@ function BracketView({ fixtures, tournament }) {
                                                 <div className={`flex items-center justify-between px-3 py-2.5 ${awayWon ? 'bg-brand-50' : 'bg-white'
                                                     }`}>
                                                     <span className={`text-sm truncate flex-1 ${isTBD ? 'text-gray-300 italic' :
-                                                            awayWon ? 'font-bold text-brand-600' :
-                                                                isDone ? 'text-gray-400' : 'font-medium text-gray-900'
+                                                        awayWon ? 'font-bold text-brand-600' :
+                                                            isDone ? 'text-gray-400' : 'font-medium text-gray-900'
                                                         }`}>
                                                         {match.away_team_name || 'TBD'}
                                                     </span>
@@ -198,6 +198,9 @@ export default function TournamentPage() {
     const [sending, setSending] = useState(false)
     const bottomRef = useRef(null)
     const tournamentId = useRef(null)
+    const [showRequestForm, setShowRequestForm] = useState(false)
+    const [requestForm, setRequestForm] = useState({ name: '', contact_name: '', contact_email: '' })
+    const [requestLoading, setRequestLoading] = useState(false)
 
     useEffect(() => {
         api.get(`/api/tournaments/${slug}`)
@@ -269,6 +272,26 @@ export default function TournamentPage() {
         setNameSet(true)
     }
 
+    async function handleRequestTeam(e) {
+        e.preventDefault()
+        setRequestLoading(true)
+        try {
+            const res = await api.post(`/api/tournaments/${tournament.id}/teams/request`, {
+                name: requestForm.name,
+                contact_name: requestForm.contact_name,
+                contact_email: requestForm.contact_email
+            })
+            alert('✅ Request submitted! Organizer will review shortly.')
+            setRequestForm({ name: '', contact_name: '', contact_email: '' })
+            setShowRequestForm(false)
+            await loadData()
+        } catch (err) {
+            alert(err.response?.data?.error || 'Request failed')
+        } finally {
+            setRequestLoading(false)
+        }
+    }
+
     const isOrganizer = user && tournament && user.id === tournament.organizer_id
     const confirmedTeams = teams.filter(t => t.status === 'confirmed')
 
@@ -306,13 +329,74 @@ export default function TournamentPage() {
                         }`}>
                         {tournament.status}
                     </span>
-                    {isOrganizer && (
+                    {isOrganizer ? (
                         <button onClick={() => navigate(`/manage/${tournament.id}`)} className="btn-primary text-xs py-1.5 px-3">
                             ⚙ Manage
+                        </button>
+                    ) : tournament.status === 'registration' && (
+                        <button onClick={() => setShowRequestForm(!showRequestForm)} className="btn-primary text-xs py-1.5 px-3">
+                            📋 Request to Join
                         </button>
                     )}
                 </div>
             </div>
+
+            {/* Request to Join Form */}
+            {showRequestForm && !isOrganizer && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-xl border border-gray-200 max-w-md w-full mx-4 p-6">
+                        <h2 className="text-lg font-bold text-gray-900 mb-4">Register Your Team</h2>
+                        <form onSubmit={handleRequestTeam} className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Team Name *</label>
+                                <input
+                                    type="text" required
+                                    value={requestForm.name}
+                                    onChange={e => setRequestForm(f => ({ ...f, name: e.target.value }))}
+                                    className="input"
+                                    placeholder="Your team name"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Contact Person</label>
+                                <input
+                                    type="text"
+                                    value={requestForm.contact_name}
+                                    onChange={e => setRequestForm(f => ({ ...f, contact_name: e.target.value }))}
+                                    className="input"
+                                    placeholder="Your name (optional)"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Contact Email</label>
+                                <input
+                                    type="email"
+                                    value={requestForm.contact_email}
+                                    onChange={e => setRequestForm(f => ({ ...f, contact_email: e.target.value }))}
+                                    className="input"
+                                    placeholder="your@email.com (optional)"
+                                />
+                            </div>
+                            <div className="flex gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowRequestForm(false)}
+                                    className="btn-secondary flex-1"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={requestLoading || !requestForm.name.trim()}
+                                    className="btn-primary flex-1 disabled:opacity-40"
+                                >
+                                    {requestLoading ? 'Submitting...' : 'Submit Request'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
 
             {/* Tabs */}
             <div className="bg-white border-b border-gray-200 overflow-x-auto">
