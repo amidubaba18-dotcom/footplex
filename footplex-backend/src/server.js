@@ -54,3 +54,14 @@ try {
     console.error(err)
     process.exit(1)
 }
+
+// Keep-alive ping for Render free tier
+if (process.env.NODE_ENV === 'production') {
+    setInterval(async () => {
+        try {
+            await fetch(`https://footplex-backend.onrender.com/health`)
+        } catch (err) {
+            console.log('Keep-alive ping failed')
+        }
+    }, 600000) // Every 10 minutes
+}
