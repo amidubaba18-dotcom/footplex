@@ -702,3 +702,17 @@ app.post('/:id/teams/request', async (request, reply) => {
 
 
 }
+
+app.delete('/:id', { preHandler: authenticate }, async (request, reply) => {
+  const tournament_id = parseInt(request.params.id)
+
+  const check = await pool.query(
+    'SELECT * FROM tournaments WHERE id=$1 AND organizer_id=$2',
+    [tournament_id, request.user.id]
+  )
+
+  if (check.rows.length === 0) return reply.status(403).send({ error: 'Not authorized' })
+
+  await pool.query('DELETE FROM tournaments WHERE id=$1', [tournament_id])
+  return reply.send({ message: 'Tournament deleted' })
+})

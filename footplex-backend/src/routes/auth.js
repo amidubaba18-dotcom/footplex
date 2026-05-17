@@ -71,4 +71,11 @@ export default async function authRoutes(app) {
         return reply.send({ user: request.user })
     })
 
+
 }
+
+
+app.delete('/me', { preHandler: authenticate }, async (request, reply) => {
+    await pool.query('DELETE FROM users WHERE id=$1', [request.user.id])
+    return reply.send({ message: 'Account deleted' })
+})

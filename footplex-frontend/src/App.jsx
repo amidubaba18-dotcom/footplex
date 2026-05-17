@@ -1,12 +1,16 @@
 import { useState, useEffect } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
+import Navigation from './components/Navigation'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import Dashboard from './pages/Dashboard'
 import CreateTournament from './pages/CreateTournament'
 import TournamentPage from './pages/TournamentPage'
 import ManageTournament from './pages/ManageTournament'
+import Profile from './pages/Profile'
+import MyEvents from './pages/MyEvents'
+import Notifications from './pages/Notifications'
 
 function Guard({ children }) {
   const { user, loading } = useAuth()
@@ -19,15 +23,21 @@ function AppRoutes() {
   if (loading) return <div className="h-screen flex items-center justify-center text-sm text-gray-500">Loading...</div>
 
   return (
-    <Routes>
-      <Route path="/login" element={!user ? <Login /> : <Navigate to="/dashboard" />} />
-      <Route path="/register" element={!user ? <Register /> : <Navigate to="/dashboard" />} />
-      <Route path="/dashboard" element={<Guard><Dashboard /></Guard>} />
-      <Route path="/create" element={<Guard><CreateTournament /></Guard>} />
-      <Route path="/manage/:id" element={<Guard><ManageTournament /></Guard>} />
-      <Route path="/t/:slug" element={<TournamentPage />} />
-      <Route path="*" element={<Navigate to="/login" />} />
-    </Routes>
+    <div className="lg:ml-64">
+      <Routes>
+        <Route path="/login" element={!user ? <Login /> : <Navigate to="/dashboard" />} />
+        <Route path="/register" element={!user ? <Register /> : <Navigate to="/dashboard" />} />
+        <Route path="/dashboard" element={<Guard><Dashboard /></Guard>} />
+        <Route path="/create" element={<Guard><CreateTournament /></Guard>} />
+        <Route path="/manage/:id" element={<Guard><ManageTournament /></Guard>} />
+        <Route path="/profile" element={<Guard><Profile /></Guard>} />
+        <Route path="/my-events" element={<Guard><MyEvents /></Guard>} />
+        <Route path="/notifications" element={<Guard><Notifications /></Guard>} />
+        <Route path="/t/:slug" element={<TournamentPage />} />
+        <Route path="*" element={<Navigate to="/login" />} />
+      </Routes>
+      {user && <div className="h-24 lg:h-0"></div>}
+    </div>
   )
 }
 
@@ -84,6 +94,7 @@ export default function App() {
   return (
     <AuthProvider>
       <InstallPrompt />
+      <Navigation />
       <AppRoutes />
     </AuthProvider>
   )
