@@ -10,7 +10,6 @@ import TournamentPage from './pages/TournamentPage'
 import ManageTournament from './pages/ManageTournament'
 import Profile from './pages/Profile'
 import MyEvents from './pages/MyEvents'
-import Notifications from './pages/Notifications'
 
 function Guard({ children }) {
   const { user, loading } = useAuth()
