@@ -83,8 +83,8 @@ export default function Navigation() {
                                 key={item.path}
                                 onClick={() => navigate(item.path)}
                                 className={`w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 transition-colors ${isActive(item.path)
-                                    ? 'bg-brand-500 text-white'
-                                    : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800'
+                                        ? 'bg-brand-500 text-white'
+                                        : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800'
                                     }`}
                             >
                                 <Icon />
@@ -119,8 +119,8 @@ export default function Navigation() {
                                 key={item.path}
                                 onClick={() => navigate(item.path)}
                                 className={`flex-1 py-4 flex flex-col items-center gap-1 transition-colors ${isActive(item.path)
-                                    ? 'text-brand-500'
-                                    : 'text-gray-600 hover:text-gray-900'
+                                        ? 'text-brand-500'
+                                        : 'text-gray-600 hover:text-gray-900'
                                     }`}
                             >
                                 <Icon />
