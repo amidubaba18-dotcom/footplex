@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
-import Navigation from './components/Navigation'
+// import Navigation from './components/Navigation'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import Dashboard from './pages/Dashboard'
@@ -31,7 +31,7 @@ function AppRoutes() {
         <Route path="/manage/:id" element={<Guard><ManageTournament /></Guard>} />
         <Route path="/profile" element={<Guard><Profile /></Guard>} />
         <Route path="/my-events" element={<Guard><MyEvents /></Guard>} />
-        <Route path="/notifications" element={<Guard><Notifications /></Guard>} />
+        {/* <Route path="/notifications" element={<Guard><Notifications /></Guard>} /> */}
         <Route path="/t/:slug" element={<TournamentPage />} />
         <Route path="*" element={<Navigate to="/login" />} />
       </Routes>
