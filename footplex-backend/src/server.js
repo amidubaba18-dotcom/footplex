@@ -13,7 +13,7 @@ const pool = new Pool({
 pool.on('error', err => console.error('Pool error:', err.message))
 
 // Plugins
-await app.register(cors, { origin: true, credentials: true, methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'] })
+await app.register(cors, { origin: '*', credentials: true, methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'] })
 await app.register(jwt, { secret: process.env.JWT_SECRET })
 
 // Middleware
