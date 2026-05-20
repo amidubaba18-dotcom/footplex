@@ -34,22 +34,7 @@ export default function Dashboard() {
                     <span className="text-xl">⚽</span>
                     <span className="font-bold text-gray-900">FootPlex</span>
                 </div>
-                <div className="flex items-center gap-3">
-                    <button
-                        onClick={() => navigate('/create')}
-                        className="btn-primary"
-                    >
-                        + Create Tournament
-                    </button>
-                    <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-full bg-brand-500 text-white flex items-center justify-center text-sm font-bold">
-                            {user?.full_name?.charAt(0)?.toUpperCase()}
-                        </div>
-                        <button onClick={logout} className="text-sm text-gray-500 hover:text-gray-700">
-                            Sign out
-                        </button>
-                    </div>
-                </div>
+                
             </nav>
 
             <div className="max-w-6xl mx-auto px-6 py-8">
