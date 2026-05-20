@@ -256,20 +256,18 @@ export default function ManageTournament() {
                     >
                         Public View ↗
                     </button>
-                    <button
-                        onClick={() => {
-                            if (window.confirm('Delete this tournament? This cannot be undone.')) {
-                                api.delete(`/api/tournaments/${id}`)
-                                    .then(() => {
-                                        navigate('/dashboard')
-                                    })
-                                    .catch(err => alert(err.response?.data?.error || 'Failed to delete'))
-                            }
-                        }}
-                        className="text-xs bg-red-100 text-red-600 px-3 py-1.5 rounded-lg hover:bg-red-200 transition-colors"
-                    >
-                        🗑 Delete
-                    </button>
+                 <button
+  onClick={() => {
+    if (window.confirm('Delete this tournament permanently?')) {
+      api.delete(`/api/tournaments/${id}`)
+        .then(() => navigate('/dashboard'))
+        .catch(err => alert(err.response?.data?.error || 'Delete failed'))
+    }
+  }}
+  className="text-xs bg-red-100 text-red-600 px-3 py-1.5 rounded-lg hover:bg-red-200 transition-colors"
+>
+  🗑 Delete
+</button>
                 </div>
 
                 {/* Status flow */}
