@@ -11,11 +11,7 @@ dotenv.config()
 const app = Fastify({ logger: false })
 
 await app.register(cors, {
-    origin: [
-        'http://localhost:5173',
-        'https://footplex-abc123.netlify.app',
-        'https://footplex-a2ek-nuf1cymdp-amidubaba18-2732s-projects.vercel.app/login'
-    ],
+    origin: true,
     credentials: true,
     methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS']
 })
