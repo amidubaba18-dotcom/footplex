@@ -209,8 +209,10 @@ app.post('/api/tournaments/:id/generate', { preHandler: authenticate }, async (r
         matchesData = generateRoundRobin(teams)
     } else if (t.format === 'single_elimination') {
         matchesData = generateSingleElimination(teams)
-    } else if (t.format === 'double_elimination') {
+    } else if (t.format === 'double_elim' || t.format === 'double_elimination') {
         matchesData = generateDoubleElimination(teams)
+    } else if (t.format === 'group_knockout') {
+        matchesData = generateGroupKnockout(teams)
     } else if (t.format === 'swiss') {
         matchesData = generateSwiss(teams)
     }
@@ -402,6 +404,39 @@ function generateSwiss(teams) {
             })
         }
     }
+
+    return matches
+}
+
+function generateGroupKnockout(teams) {
+    const matches = []
+    let round = 1
+    let matchNum = 1
+
+    // Group stage - simple round robin within groups
+    const groupSize = Math.ceil(teams.length / 2)
+    for (let i = 0; i < teams.length; i++) {
+        for (let j = i + 1; j < teams.length; j++) {
+            matches.push({
+                home_team_id: teams[i].id,
+                away_team_id: teams[j].id,
+                round_number: round,
+                match_number: matchNum++,
+                match_type: 'group',
+                group_name: Math.ceil((i + 1) / groupSize) === Math.ceil((j + 1) / groupSize) ? 'A' : 'B'
+            })
+        }
+    }
+
+    // Knockout stage placeholder
+    matches.push({
+        home_team_id: null,
+        away_team_id: null,
+        round_number: round + 1,
+        match_number: 1,
+        match_type: 'knockout',
+        is_placeholder: true
+    })
 
     return matches
 }
