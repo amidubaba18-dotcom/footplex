@@ -2,603 +2,288 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import api from '../lib/api'
 
-function MatchCard({ match, isFinal }) {
-    const homeWon = match.winner_team_id === match.home_team_id
-    const awayWon = match.winner_team_id === match.away_team_id
-    const isDone = match.status === 'completed'
-    const isTBD = !match.home_team_name && !match.away_team_name
-
-    return (
-        <div className={`w-52 rounded-xl overflow-hidden border shadow-sm ${isFinal ? 'border-brand-200' : 'border-gray-200'}`}>
-            <div className={`flex items-center justify-between px-3 py-2.5 border-b ${homeWon ? 'bg-brand-50 border-brand-100' : 'border-gray-100'}`}>
-                <span className={`text-sm truncate flex-1 ${isTBD ? 'text-gray-300 italic' : homeWon ? 'font-bold text-brand-600' : isDone ? 'text-gray-400' : 'font-medium text-gray-900'}`}>
-                    {match.home_team_name || 'TBD'}
-                </span>
-                <div className="flex items-center gap-1 ml-2">
-                    {isDone && (
-                        <span className={`text-sm font-bold w-5 text-right ${homeWon ? 'text-brand-600' : 'text-gray-400'}`}>
-                            {match.home_score}
-                        </span>
-                    )}
-                    {homeWon && <span className="text-brand-500 text-xs">✓</span>}
-                </div>
-            </div>
-
-            <div className={`flex items-center justify-between px-3 py-2.5 ${awayWon ? 'bg-brand-50' : 'bg-white'}`}>
-                <span className={`text-sm truncate flex-1 ${isTBD ? 'text-gray-300 italic' : awayWon ? 'font-bold text-brand-600' : isDone ? 'text-gray-400' : 'font-medium text-gray-900'}`}>
-                    {match.away_team_name || 'TBD'}
-                </span>
-                <div className="flex items-center gap-1 ml-2">
-                    {isDone && (
-                        <span className={`text-sm font-bold w-5 text-right ${awayWon ? 'text-brand-600' : 'text-gray-400'}`}>
-                            {match.away_score}
-                        </span>
-                    )}
-                    {awayWon && <span className="text-brand-500 text-xs">✓</span>}
-                </div>
-            </div>
-        </div>
-    )
-}
-
-function BracketView({ fixtures, tournament }) {
-    if (tournament.format === 'round_robin' || tournament.format === 'swiss') {
-        return (
-            <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-sm text-gray-500">
-                Bracket view not available for {tournament.format.replace(/_/g, ' ')} — see Fixtures tab.
-            </div>
-        )
-    }
-
-    if (fixtures.length === 0) {
-        return (
-            <div className="bg-white rounded-xl border border-gray-200 p-12 text-center text-gray-400 text-sm">
-                No fixtures generated yet
-            </div>
-        )
-    }
-
-    const rounds = [...new Set(fixtures.map(f => f.round_number))].sort((a, b) => a - b)
-    const totalRounds = rounds.length
-    const groupRounds = tournament?.format === 'group_knockout'
-        ? [...new Set(fixtures.filter(f => f.group_name).map(f => f.round_number))].sort((a, b) => a - b)
-        : []
-    const knockoutRounds = tournament?.format === 'group_knockout'
-        ? [...new Set(fixtures.filter(f => !f.group_name).map(f => f.round_number))].sort((a, b) => a - b)
-        : []
-
-    function getRoundName(roundNum) {
-        if (tournament?.format === 'group_knockout') {
-            const groupIndex = groupRounds.indexOf(roundNum)
-            if (groupIndex !== -1) {
-                return `Group Round ${groupIndex + 1}`
-            }
-
-            const knockoutIndex = knockoutRounds.indexOf(roundNum)
-            if (knockoutIndex !== -1) {
-                const fromEnd = knockoutRounds.length - knockoutIndex
-                if (fromEnd === 1) return '🏆 Final'
-                if (fromEnd === 2) return 'Semi-Finals'
-                if (fromEnd === 3) return 'Quarter-Finals'
-                if (fromEnd === 4) return 'Round of 16'
-                if (fromEnd === 5) return 'Round of 32'
-                return `Knockout Round ${knockoutIndex + 1}`
-            }
-        }
-
-        const roundIndex = rounds.indexOf(roundNum)
-        const fromEnd = totalRounds - roundIndex
-        if (fromEnd === 1) return '🏆 Final'
-        if (fromEnd === 2) return 'Semi-Finals'
-        if (fromEnd === 3) return 'Quarter-Finals'
-        if (fromEnd === 4) return 'Round of 16'
-        if (fromEnd === 5) return 'Round of 32'
-        return `Round ${roundNum}`
-    }
-
-    return (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-            <div className="p-4 border-b border-gray-100 flex items-center justify-between">
-                <div>
-                    <p className="text-sm font-semibold text-gray-900">Tournament Bracket</p>
-                    <p className="text-xs text-gray-400 mt-0.5">
-                        {fixtures.filter(f => f.status === 'completed').length} of {fixtures.length} matches completed
-                    </p>
-                </div>
-                <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full capitalize">
-                    {tournament.format.replace(/_/g, ' ')}
-                </span>
-            </div>
-
-            <div className="overflow-x-auto p-6">
-                <div className="flex gap-8 min-w-max items-start">
-                    {rounds.map((round, roundIdx) => {
-                        const roundMatches = fixtures.filter(f => f.round_number === round)
-                        const isFinal = getRoundName(round) === '🏆 Final'
-
-                        return (
-                            <div key={round} className="flex flex-col gap-2">
-                                <div className={`text-center mb-3 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wide ${getRoundName(round) === '🏆 Final'
-                                    ? 'bg-yellow-400 text-yellow-900'
-                                    : isFinal
-                                        ? 'bg-brand-500 text-white'
-                                        : 'bg-gray-100 text-gray-500'
-                                    }`}>
-                                    {getRoundName(round)}
-                                </div>
-
-                                <div className="flex flex-col gap-6 justify-around" style={{
-                                    minHeight: `${Math.max(roundMatches.length, 1) * 90}px`
-                                }}>
-                                    {roundMatches.map(match => (
-                                        <MatchCard key={match.id} match={match} isFinal={isFinal} />
-                                    ))}
-                                </div>
-                            </div>
-                        )
-                    })}
-                </div>
-            </div>
-        </div>
-    )
-}
-
-const TABS = ['teams', 'fixtures', 'bracket', 'scores', 'settings']
-
 export default function ManageTournament() {
     const { id } = useParams()
     const navigate = useNavigate()
     const [tournament, setTournament] = useState(null)
     const [teams, setTeams] = useState([])
     const [fixtures, setFixtures] = useState([])
+    const [standings, setStandings] = useState([])
     const [loading, setLoading] = useState(true)
-    const [tab, setTab] = useState('teams')
-    const [scores, setScores] = useState({})
-    const [submitting, setSubmitting] = useState(null)
-    const [generating, setGenerating] = useState(false)
-    const [showAddTeam, setShowAddTeam] = useState(false)
+    const [activeTab, setActiveTab] = useState('teams')
     const [newTeam, setNewTeam] = useState({ name: '', contact_name: '', contact_email: '' })
     const [addingTeam, setAddingTeam] = useState(false)
-
-    async function loadData() {
-        const [teamsRes, fixturesRes] = await Promise.all([
-            api.get(`/api/tournaments/${id}/teams`),
-            api.get(`/api/tournaments/${id}/fixtures`),
-        ])
-        setTeams(teamsRes.data.teams)
-        setFixtures(fixturesRes.data.matches)
-    }
+    const [showAddTeam, setShowAddTeam] = useState(false)
 
     useEffect(() => {
-        api.get('/api/tournaments/my')
-            .then(res => setTournament(res.data.tournaments.find(t => t.id === parseInt(id))))
-        loadData().catch(console.error).finally(() => setLoading(false))
+        loadData()
     }, [id])
+
+    async function loadData() {
+        try {
+            const [tRes, teamsRes, fixturesRes, standingsRes] = await Promise.all([
+                api.get(`/api/tournaments/${id}`),
+                api.get(`/api/tournaments/${id}/teams`),
+                api.get(`/api/tournaments/${id}/fixtures`),
+                api.get(`/api/tournaments/${id}/standings`)
+            ])
+
+            setTournament(tRes.data.tournament)
+            setTeams(teamsRes.data.teams || [])
+            setFixtures(fixturesRes.data.fixtures || [])
+            setStandings(standingsRes.data.standings || [])
+        } catch (err) {
+            console.error('Load error:', err)
+        } finally {
+            setLoading(false)
+        }
+    }
 
     async function handleAddTeam(e) {
         e.preventDefault()
+        if (!newTeam.name) return alert('Team name required')
+
         setAddingTeam(true)
         try {
-            await api.post(`/api/tournaments/${id}/teams`, newTeam)
+            const res = await api.post(`/api/tournaments/${id}/teams`, newTeam)
+            setTeams([...teams, res.data.team])
             setNewTeam({ name: '', contact_name: '', contact_email: '' })
             setShowAddTeam(false)
-            await loadData()
-        } catch (err) { alert(err.response?.data?.error || 'Failed') }
-        finally { setAddingTeam(false) }
-    }
-
-    async function handleTeamStatus(teamId, status) {
-        try {
-            await api.patch(`/api/tournaments/${id}/teams/${teamId}`, { status })
-            await loadData()
-        } catch (err) { alert('Failed') }
-    }
-
-    async function handleGenerate() {
-        if (!confirm('Generate fixtures? This will delete existing ones.')) return
-        setGenerating(true)
-        try {
-            const res = await api.post(`/api/tournaments/${id}/generate`, {})
-            alert(`Generated ${res.data.matches.length} matches!`)
-            await loadData()
-            setTab('fixtures')
-        } catch (err) { alert(err.response?.data?.error || 'Failed') }
-        finally { setGenerating(false) }
-    }
-
-    async function handleScore(matchId) {
-        const s = scores[matchId]
-        if (s?.home === undefined || s?.away === undefined || s?.home === '' || s?.away === '') {
-            alert('Enter both scores')
-            return
+        } catch (err) {
+            alert(err.response?.data?.error || 'Failed to add team')
+        } finally {
+            setAddingTeam(false)
         }
-        setSubmitting(matchId)
+    }
+
+    async function handleGenerateFixtures() {
+        try {
+            await api.post(`/api/tournaments/${id}/generate`)
+            await loadData()
+        } catch (err) {
+            alert(err.response?.data?.error || 'Failed to generate fixtures')
+        }
+    }
+
+    async function handleScoreSubmit(matchId, homeScore, awayScore) {
         try {
             await api.patch(`/api/tournaments/${id}/matches/${matchId}/score`, {
-                home_score: parseInt(s.home),
-                away_score: parseInt(s.away)
+                home_score: homeScore,
+                away_score: awayScore
             })
             await loadData()
-            setScores(prev => { const c = { ...prev }; delete c[matchId]; return c })
-        } catch (err) { alert('Failed') }
-        finally { setSubmitting(null) }
+        } catch (err) {
+            alert(err.response?.data?.error || 'Failed to submit score')
+        }
     }
 
-    const confirmed = teams.filter(t => t.status === 'confirmed')
-    const pending = teams.filter(t => t.status === 'pending')
-    const scheduled = fixtures.filter(f => f.status === 'scheduled')
-    const completed = fixtures.filter(f => f.status === 'completed')
+    async function handleDeleteTournament() {
+        if (!window.confirm('Delete this tournament permanently?')) return
 
-    if (loading) return (
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-            <p className="text-sm text-gray-400">Loading...</p>
-        </div>
-    )
+        try {
+            await api.delete(`/api/tournaments/${id}`)
+            navigate('/dashboard')
+        } catch (err) {
+            alert(err.response?.data?.error || 'Delete failed')
+        }
+    }
+
+    if (loading) return <div className="p-8 text-center">Loading...</div>
+    if (!tournament) return <div className="p-8 text-center">Tournament not found</div>
+
+    const confirmed = (teams || []).filter(t => t.status === 'confirmed')
+    const pending = (teams || []).filter(t => t.status === 'pending')
+    const groupMatches = (fixtures || []).filter(f => f.group_name)
+    const knockoutMatches = (fixtures || []).filter(f => !f.group_name)
 
     return (
-        <div className="min-h-screen bg-gray-50">
-
+        <div className="max-w-6xl mx-auto px-6 py-8">
             {/* Header */}
-            <div className="bg-white border-b border-gray-200 px-6 py-4">
-                <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-3">
-                        <button onClick={() => navigate('/dashboard')} className="text-gray-400 hover:text-gray-600 text-sm">←</button>
-                        <div>
-                            <h1 className="font-bold text-gray-900">{tournament?.name || 'Manage Tournament'}</h1>
-                            <p className="text-xs text-gray-500 capitalize">
-                                {tournament?.tournament_type} · {tournament?.format?.replace(/_/g, ' ')}
-                            </p>
-                        </div>
-                    </div>
+            <div className="flex items-center justify-between mb-8">
+                <div>
+                    <h1 className="text-3xl font-bold text-gray-900">{tournament.name}</h1>
+                    <p className="text-gray-500 text-sm mt-1 capitalize">{tournament.format.replace(/_/g, ' ')}</p>
+                </div>
+                <div className="flex gap-2">
                     <button
-                        onClick={() => navigate(`/t/${tournament?.slug}`)}
-                        className="btn-secondary text-xs py-1.5 px-3"
+                        onClick={() => navigate(`/t/${tournament.slug}`)}
+                        className="text-sm bg-gray-100 text-gray-600 px-4 py-2 rounded-lg hover:bg-gray-200"
                     >
-                        Public View ↗
+                        👁 View Public
                     </button>
-                 <button
-  onClick={() => {
-    if (window.confirm('Delete this tournament permanently?')) {
-      api.delete(`/api/tournaments/${id}`)
-        .then(() => navigate('/dashboard'))
-        .catch(err => alert(err.response?.data?.error || 'Delete failed'))
-    }
-  }}
-  className="text-xs bg-red-100 text-red-600 px-3 py-1.5 rounded-lg hover:bg-red-200 transition-colors"
->
-  🗑 Delete
-</button>
+                    <button
+                        onClick={handleDeleteTournament}
+                        className="text-sm bg-red-100 text-red-600 px-3 py-2 rounded-lg hover:bg-red-200"
+                    >
+                        🗑 Delete
+                    </button>
                 </div>
-
-                {/* Status flow */}
-                <div className="flex items-center gap-2">
-                    {['draft', 'registration', 'active', 'completed'].map((s, i, arr) => {
-                        const cur = tournament?.status
-                        const isActive = cur === s
-                        const isPast = arr.indexOf(cur) > i
-                        return (
-                            <div key={s} className="flex items-center gap-2">
-                                <button
-                                    onClick={() => !isActive && !isPast && handleStatus(s)}
-                                    disabled={isActive || isPast}
-                                    className={`text-xs px-3 py-1.5 rounded-full font-medium capitalize transition-colors ${isActive ? 'bg-gray-900 text-white' :
-                                        isPast ? 'bg-green-100 text-green-700 cursor-default' :
-                                            'bg-gray-100 text-gray-500 hover:bg-gray-200 cursor-pointer'
-                                        }`}
-                                >
-                                    {isPast ? '✓ ' : ''}{s}
-                                </button>
-                                {i < arr.length - 1 && <span className="text-gray-300 text-xs">→</span>}
-                            </div>
-                        )
-                    })}
-                </div>
-                <p className="text-xs text-gray-400 mt-1.5">
-                    {tournament?.status === 'draft' && 'Set to Registration to make this tournament public.'}
-                    {tournament?.status === 'registration' && 'Tournament is open. Teams can register.'}
-                    {tournament?.status === 'active' && 'Tournament is live. Submit scores in the Scores tab.'}
-                    {tournament?.status === 'completed' && 'Tournament is finished.'}
-                </p>
-            </div>
-
-            {/* Stats */}
-            <div className="bg-white border-b border-gray-200 px-6 py-3 flex gap-8">
-                {[
-                    { label: 'Teams', value: confirmed.length },
-                    { label: 'Pending', value: pending.length },
-                    { label: 'Matches', value: fixtures.length },
-                    { label: 'Completed', value: completed.length },
-                ].map(s => (
-                    <div key={s.label}>
-                        <p className="text-lg font-bold text-gray-900">{s.value}</p>
-                        <p className="text-xs text-gray-400">{s.label}</p>
-                    </div>
-                ))}
             </div>
 
             {/* Tabs */}
-            <div className="bg-white border-b border-gray-200 overflow-x-auto">
-                <div className="flex px-6 min-w-max">
-                    {TABS.map(t => (
-                        <button key={t} onClick={() => setTab(t)}
-                            className={`py-3 px-4 text-sm font-medium capitalize border-b-2 transition-colors ${tab === t ? 'border-gray-900 text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-700'
-                                }`}>
-                            {t}
-                            {t === 'teams' && pending.length > 0 && (
-                                <span className="ml-1.5 bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full">{pending.length}</span>
-                            )}
+            <div className="flex gap-2 mb-6 border-b border-gray-200">
+                {['teams', 'fixtures', 'standings', 'bracket'].map(tab => (
+                    <button
+                        key={tab}
+                        onClick={() => setActiveTab(tab)}
+                        className={`px-4 py-2 font-medium text-sm capitalize transition-colors ${activeTab === tab
+                                ? 'text-brand-500 border-b-2 border-brand-500'
+                                : 'text-gray-600 hover:text-gray-900'
+                            }`}
+                    >
+                        {tab}
+                    </button>
+                ))}
+            </div>
+
+            {/* TEAMS TAB */}
+            {activeTab === 'teams' && (
+                <div className="space-y-6">
+                    {confirmed.length < tournament.max_teams && (
+                        <button
+                            onClick={() => setShowAddTeam(!showAddTeam)}
+                            className="btn-primary text-sm"
+                        >
+                            ➕ Add Team
                         </button>
-                    ))}
-                </div>
-            </div>
+                    )}
 
-            <div className="max-w-3xl mx-auto px-6 py-6">
-
-                {/* TEAMS TAB */}
-                {tab === 'teams' && (
-                    <div className="space-y-4">
-                        <div className="flex gap-3">
-                            <button onClick={() => setShowAddTeam(!showAddTeam)} className="btn-primary text-sm">
-                                {showAddTeam ? 'Cancel' : '+ Add Team'}
-                            </button>
-                            <button
-                                onClick={handleGenerate}
-                                disabled={generating || confirmed.length < 2}
-                                className="btn-secondary text-sm disabled:opacity-40"
-                            >
-                                {generating ? 'Generating...' : '⚡ Generate Fixtures'}
-                            </button>
-                        </div>
-
-                        {confirmed.length < 2 && (
-                            <p className="text-xs text-gray-400">Need at least 2 confirmed teams to generate fixtures</p>
-                        )}
-
-                        {showAddTeam && (
-                            <form onSubmit={handleAddTeam} className="card space-y-3">
-                                <h3 className="font-semibold text-gray-900 text-sm">Add New Team</h3>
-                                {confirmed.length >= tournament?.max_teams && (
-                                    <div className="p-3 bg-yellow-50 border border-yellow-200 text-yellow-700 text-sm rounded-lg">
-                                        ⚠️ Tournament is full ({confirmed.length}/{tournament?.max_teams} teams)
-                                    </div>
-                                )}
-                                {[
-                                    { key: 'name', placeholder: 'Team name *', required: true },
-                                    { key: 'contact_name', placeholder: 'Contact person (optional)' },
-                                    { key: 'contact_email', placeholder: 'Contact email (optional)' },
-                                ].map(f => (
-                                    <input key={f.key} required={f.required} placeholder={f.placeholder}
-                                        value={newTeam[f.key]}
-                                        onChange={e => setNewTeam(n => ({ ...n, [f.key]: e.target.value }))}
-                                        className="input" />
-                                ))}
-                                <button
-                                    type="submit"
-                                    disabled={addingTeam || confirmed.length >= tournament?.max_teams}
-                                    className="btn-primary w-full justify-center flex disabled:opacity-40"
-                                >
-                                    {addingTeam ? 'Adding...' : confirmed.length >= tournament?.max_teams ? 'Tournament Full' : 'Add Team'}
-                                </button>
-                            </form>
-                        )}
-
-                        {pending.length > 0 && (
-                            <div>
-                                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Pending Approval</p>
-                                <div className="space-y-2">
-                                    {pending.map(team => (
-                                        <div key={team.id} className="card flex items-center justify-between gap-3 bg-yellow-50 border-yellow-200">
-                                            <div>
-                                                <p className="font-medium text-sm text-gray-900">{team.name}</p>
-                                                {team.contact_name && <p className="text-xs text-gray-500">{team.contact_name}</p>}
-                                            </div>
-                                            <div className="flex gap-2">
-                                                <button onClick={() => handleTeamStatus(team.id, 'confirmed')}
-                                                    className="text-xs bg-green-500 text-white px-3 py-1.5 rounded-lg font-medium">
-                                                    Approve
-                                                </button>
-                                                <button onClick={() => handleTeamStatus(team.id, 'disqualified')}
-                                                    className="text-xs bg-red-100 text-red-600 px-3 py-1.5 rounded-lg font-medium">
-                                                    Reject
-                                                </button>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-
-                        <div>
-                            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
-                                Confirmed Teams ({confirmed.length})
-                            </p>
-                            {confirmed.length === 0 ? (
-                                <div className="card text-center text-sm text-gray-400 py-8">No confirmed teams yet</div>
-                            ) : (
-                                <div className="space-y-2">
-                                    {confirmed.map((team, i) => (
-                                        <div key={team.id} className="card flex items-center gap-3">
-                                            <div className="w-7 h-7 rounded-lg bg-gray-100 flex items-center justify-center text-xs font-bold text-gray-500">
-                                                {i + 1}
-                                            </div>
-                                            <div className="flex-1">
-                                                <p className="font-medium text-sm text-gray-900">{team.name}</p>
-                                                {team.contact_name && <p className="text-xs text-gray-400">{team.contact_name}</p>}
-                                            </div>
-                                            <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">Confirmed</span>
-                                        </div>
-                                    ))}
+                    {showAddTeam && (
+                        <form onSubmit={handleAddTeam} className="card space-y-3">
+                            {confirmed.length >= tournament.max_teams && (
+                                <div className="p-3 bg-yellow-50 border border-yellow-200 text-yellow-700 text-sm rounded-lg">
+                                    ⚠️ Tournament full ({confirmed.length}/{tournament.max_teams})
                                 </div>
                             )}
-                        </div>
-                    </div>
-                )}
-
-                {/* FIXTURES TAB */}
-                {tab === 'fixtures' && (
-                    <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                            <p className="text-sm text-gray-500">{completed.length}/{fixtures.length} matches completed</p>
-                            <button onClick={handleGenerate} disabled={generating}
-                                className="btn-secondary text-xs py-1.5 px-3 disabled:opacity-40">
-                                {generating ? 'Regenerating...' : '↺ Regenerate'}
+                            <input required placeholder="Team name" value={newTeam.name} onChange={e => setNewTeam(n => ({ ...n, name: e.target.value }))} className="input" />
+                            <input placeholder="Contact (optional)" value={newTeam.contact_name} onChange={e => setNewTeam(n => ({ ...n, contact_name: e.target.value }))} className="input" />
+                            <input placeholder="Email (optional)" value={newTeam.contact_email} onChange={e => setNewTeam(n => ({ ...n, contact_email: e.target.value }))} className="input" />
+                            <button type="submit" disabled={addingTeam} className="btn-primary w-full disabled:opacity-40">
+                                {addingTeam ? 'Adding...' : 'Add Team'}
                             </button>
-                        </div>
+                        </form>
+                    )}
 
-                        {fixtures.length === 0 ? (
-                            <div className="card text-center text-sm text-gray-400 py-12">
-                                No fixtures yet. Add teams and click Generate Fixtures.
-                            </div>
-                        ) : (
-                            (() => {
-                                // Group by round
-                                const rounds = [...new Set(fixtures.map(f => f.round_number))].sort((a, b) => a - b)
-                                return rounds.map(round => {
-                                    const roundMatches = fixtures.filter(f => f.round_number === round)
-                                    // Get round label from first match
-                                    const firstMatch = roundMatches[0]
-                                    const label = firstMatch?.round_label ||
-                                        (firstMatch?.match_type === 'final' ? 'Final' :
-                                            firstMatch?.match_type === 'semi_final' ? 'Semi-Finals' :
-                                                firstMatch?.match_type === 'quarter_final' ? 'Quarter-Finals' :
-                                                    firstMatch?.group_name ? `Group ${firstMatch.group_name}` :
-                                                        `Round ${round}`)
-
-                                    return (
-                                        <div key={round}>
-                                            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
-                                                {label}
-                                            </p>
-                                            <div className="space-y-2">
-                                                {roundMatches.map(match => (
-                                                    <div key={match.id} className="card">
-                                                        <div className="flex items-center justify-between gap-3">
-                                                            <span className={`font-medium text-sm flex-1 ${match.winner_team_id === match.home_team_id ? 'text-brand-500 font-bold' : 'text-gray-900'
-                                                                }`}>
-                                                                {match.home_team_name || 'TBD'}
-                                                            </span>
-                                                            <div className="text-center px-4">
-                                                                {match.status === 'completed' ? (
-                                                                    <span className="font-bold text-gray-900">
-                                                                        {match.home_score} – {match.away_score}
-                                                                    </span>
-                                                                ) : match.is_placeholder ? (
-                                                                    <span className="text-xs text-gray-300 bg-gray-50 px-3 py-1 rounded-full">TBD</span>
-                                                                ) : (
-                                                                    <span className="text-xs text-gray-400 bg-gray-100 px-3 py-1 rounded-full">vs</span>
-                                                                )}
-                                                            </div>
-                                                            <span className={`font-medium text-sm flex-1 text-right ${match.winner_team_id === match.away_team_id ? 'text-brand-500 font-bold' : 'text-gray-900'
-                                                                }`}>
-                                                                {match.away_team_name || 'TBD'}
-                                                            </span>
-                                                        </div>
-                                                        {match.group_name && (
-                                                            <p className="text-xs text-gray-400 mt-1">Group {match.group_name}</p>
-                                                        )}
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )
-                                })
-                            })()
-                        )}
-                    </div>
-                )}
-
-                {tab === 'bracket' && (
-                    <BracketView fixtures={fixtures} tournament={tournament} />
-                )}
-
-                {/* SCORES TAB */}
-                {tab === 'scores' && (
-                    <div className="space-y-3">
-                        {scheduled.length === 0 ? (
-                            <div className="card text-center text-sm text-gray-400 py-12">
-                                {fixtures.length === 0 ? 'Generate fixtures first.' : '🎉 All matches scored!'}
-                            </div>
-                        ) : (
-                            scheduled.map(match => (
-                                <div key={match.id} className="card">
-                                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Round {match.round_number}</p>
-                                    <div className="flex items-center gap-3">
-                                        <div className="flex-1">
-                                            <p className="text-sm font-medium text-gray-900 mb-1.5">{match.home_team_name}</p>
-                                            <input type="number" min="0" max="30" placeholder="0"
-                                                value={scores[match.id]?.home ?? ''}
-                                                onChange={e => setScores(p => ({ ...p, [match.id]: { ...p[match.id], home: e.target.value } }))}
-                                                className="input text-center text-lg font-bold"
-                                            />
-                                        </div>
-                                        <span className="text-gray-300 font-bold mt-6">–</span>
-                                        <div className="flex-1">
-                                            <p className="text-sm font-medium text-gray-900 mb-1.5 text-right">{match.away_team_name}</p>
-                                            <input type="number" min="0" max="30" placeholder="0"
-                                                value={scores[match.id]?.away ?? ''}
-                                                onChange={e => setScores(p => ({ ...p, [match.id]: { ...p[match.id], away: e.target.value } }))}
-                                                className="input text-center text-lg font-bold"
-                                            />
-                                        </div>
-                                    </div>
-                                    <button
-                                        onClick={() => handleScore(match.id)}
-                                        disabled={
-                                            submitting === match.id ||
-                                            scores[match.id]?.home === undefined ||
-                                            scores[match.id]?.away === undefined ||
-                                            scores[match.id]?.home === '' ||
-                                            scores[match.id]?.away === ''
-                                        }
-                                        className="btn-primary w-full justify-center flex mt-3 disabled:opacity-40"
-                                    >
-                                        {submitting === match.id ? 'Saving...' : 'Submit Score'}
-                                    </button>
+                    <div>
+                        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Confirmed ({confirmed.length}/{tournament.max_teams})</p>
+                        <div className="space-y-2">
+                            {confirmed.map(t => (
+                                <div key={t.id} className="card p-4 flex items-center justify-between">
+                                    <span className="font-medium">{t.name}</span>
+                                    <span className="text-xs text-gray-400">{t.contact_email || 'No contact'}</span>
                                 </div>
-                            ))
-                        )}
+                            ))}
+                        </div>
                     </div>
-                )}
 
-                {/* SETTINGS TAB */}
-                {tab === 'settings' && (
-                    <div className="space-y-4">
-                        <div className="card">
-                            <h3 className="font-semibold text-gray-900 mb-4">Tournament Info</h3>
-                            <div className="space-y-3">
-                                {[
-                                    { label: 'Name', value: tournament?.name },
-                                    { label: 'Type', value: tournament?.tournament_type },
-                                    { label: 'Format', value: tournament?.format?.replace(/_/g, ' ') },
-                                    { label: 'Max Teams', value: tournament?.max_teams },
-                                    { label: 'Status', value: tournament?.status },
-                                ].map(item => (
-                                    <div key={item.label} className="flex justify-between py-2 border-b border-gray-50 last:border-0">
-                                        <span className="text-sm text-gray-500">{item.label}</span>
-                                        <span className="text-sm font-medium text-gray-900 capitalize">{item.value}</span>
+                    {pending.length > 0 && (
+                        <div>
+                            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Pending ({pending.length})</p>
+                            <div className="space-y-2">
+                                {pending.map(t => (
+                                    <div key={t.id} className="card bg-yellow-50 border-yellow-200 p-4 flex items-center justify-between">
+                                        <span>{t.name}</span>
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={() => api.patch(`/api/tournaments/${id}/teams/${t.id}`, { action: 'approve' }).then(() => loadData())}
+                                                className="text-xs bg-green-100 text-green-600 px-2 py-1 rounded hover:bg-green-200"
+                                            >
+                                                ✓
+                                            </button>
+                                            <button
+                                                onClick={() => api.patch(`/api/tournaments/${id}/teams/${t.id}`, { action: 'reject' }).then(() => loadData())}
+                                                className="text-xs bg-red-100 text-red-600 px-2 py-1 rounded hover:bg-red-200"
+                                            >
+                                                ✗
+                                            </button>
+                                        </div>
                                     </div>
                                 ))}
                             </div>
                         </div>
+                    )}
 
-                        <div className="card">
-                            <h3 className="font-semibold text-gray-900 mb-3">Share Tournament</h3>
-                            <div className="flex items-center gap-2 bg-gray-50 rounded-lg p-3">
-                                <span className="text-xs text-gray-400 flex-1 truncate">
-                                    {window.location.origin}/t/{tournament?.slug}
-                                </span>
-                                <button
-                                    onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/t/${tournament?.slug}`); alert('Copied!') }}
-                                    className="btn-secondary text-xs py-1.5 px-3"
-                                >
-                                    Copy
-                                </button>
+                    {confirmed.length >= 2 && !fixtures.length && (
+                        <button onClick={handleGenerateFixtures} className="btn-primary w-full">
+                            🎯 Generate Fixtures
+                        </button>
+                    )}
+                </div>
+            )}
+
+            {/* FIXTURES TAB */}
+            {activeTab === 'fixtures' && (
+                <div className="space-y-4">
+                    {(!fixtures || fixtures.length === 0) ? (
+                        <div className="card p-8 text-center text-gray-400">No fixtures yet</div>
+                    ) : (
+                        (fixtures || []).map(match => (
+                            <div key={match.id} className="card p-4">
+                                <div className="grid grid-cols-3 gap-4 items-center">
+                                    <div className="text-right">
+                                        <p className="font-semibold">{match.home_team_name || 'TBD'}</p>
+                                    </div>
+                                    <div className="text-center">
+                                        {match.status === 'completed' ? (
+                                            <p className="text-lg font-bold">{match.home_score} - {match.away_score}</p>
+                                        ) : (
+                                            <div className="flex gap-1 justify-center">
+                                                <input type="number" min="0" placeholder="0" className="input w-12 text-center" onChange={e => window.homeScore = e.target.value} />
+                                                <span>-</span>
+                                                <input type="number" min="0" placeholder="0" className="input w-12 text-center" onChange={e => window.awayScore = e.target.value} />
+                                                <button
+                                                    onClick={() => handleScoreSubmit(match.id, parseInt(window.homeScore || 0), parseInt(window.awayScore || 0))}
+                                                    className="text-xs bg-brand-500 text-white px-2 py-1 rounded"
+                                                >
+                                                    Save
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="text-left">
+                                        <p className="font-semibold">{match.away_team_name || 'TBD'}</p>
+                                    </div>
+                                </div>
                             </div>
-                        </div>
-                    </div>
-                )}
+                        ))
+                    )}
+                </div>
+            )}
 
-            </div>
+            {/* STANDINGS TAB */}
+            {activeTab === 'standings' && (
+                <div className="card overflow-hidden">
+                    <table className="w-full text-sm">
+                        <thead className="bg-gray-50 border-b">
+                            <tr>
+                                <th className="px-4 py-2 text-left">Team</th>
+                                <th className="px-4 py-2 text-center">P</th>
+                                <th className="px-4 py-2 text-center">W</th>
+                                <th className="px-4 py-2 text-center">Pts</th>
+                                <th className="px-4 py-2 text-center">GD</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {(standings || []).map((team, i) => (
+                                <tr key={team.id} className="border-b hover:bg-gray-50">
+                                    <td className="px-4 py-2 font-medium">{i + 1}. {team.name}</td>
+                                    <td className="px-4 py-2 text-center text-gray-500">-</td>
+                                    <td className="px-4 py-2 text-center text-gray-500">-</td>
+                                    <td className="px-4 py-2 text-center font-bold">{team.points}</td>
+                                    <td className="px-4 py-2 text-center text-gray-500">{team.goal_difference}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+
+            {/* BRACKET TAB */}
+            {activeTab === 'bracket' && (
+                <div className="card p-8 text-center text-gray-400">
+                    Bracket view for {tournament.format}
+                </div>
+            )}
         </div>
     )
 }
