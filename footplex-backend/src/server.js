@@ -245,7 +245,11 @@ app.patch('/api/tournaments/:id/matches/:matchId/score', async (request, reply) 
     const { home_score, away_score } = request.body
     const match_id = parseInt(request.params.matchId)
 
-
+    // Validate scores are numbers
+    if (home_score === undefined || away_score === undefined ||
+        isNaN(home_score) || isNaN(away_score)) {
+        return reply.status(400).send({ error: 'Both scores must be valid numbers' })
+    }
 
     const match = await pool.query('SELECT * FROM matches WHERE id=$1', [match_id])
     if (match.rows.length === 0) return reply.status(404).send({ error: 'Match not found' })
@@ -309,7 +313,6 @@ function generateRoundRobin(teams) {
 function generateSingleElimination(teams) {
     const matches = []
     let round = 1
-    let matchNum = 1
     let currentTeams = [...teams]
 
     while (currentTeams.length > 1) {
@@ -333,7 +336,6 @@ function generateSingleElimination(teams) {
 function generateDoubleElimination(teams) {
     const matches = []
     let round = 1
-    let matchNum = 1
     let currentTeams = [...teams]
 
     // Winners bracket
@@ -398,29 +400,6 @@ app.listen({ port: PORT, host: '0.0.0.0' }, (err, address) => {
         process.exit(1)
     }
     console.log(`✅ FootPlex backend running on port ${PORT}`)
-})
-
-app.patch('/api/tournaments/:id/matches/:matchId/score', async (request, reply) => {
-    const { home_score, away_score } = request.body
-    const match_id = parseInt(request.params.matchId)
-
-    // Validate scores are numbers
-    if (home_score === undefined || away_score === undefined ||
-        isNaN(home_score) || isNaN(away_score)) {
-        return reply.status(400).send({ error: 'Both scores must be valid numbers' })
-    }
-
-    const match = await pool.query('SELECT * FROM matches WHERE id=$1', [match_id])
-    if (match.rows.length === 0) return reply.status(404).send({ error: 'Match not found' })
-
-    const winner_team_id = home_score > away_score ? match.rows[0].home_team_id : match.rows[0].away_team_id
-
-    await pool.query(
-        'UPDATE matches SET home_score=$1, away_score=$2, status=$3, winner_team_id=$4 WHERE id=$5',
-        [home_score, away_score, 'completed', winner_team_id, match_id]
-    )
-
-    return { message: 'Score recorded' }
 })
 
 export default app
