@@ -176,7 +176,7 @@ function BracketView({ fixtures, tournament }) {
     )
 }
 
-const getTabs = (format) => format === 'single_elim'
+const getTabs = (format) => format === 'single_elimination'
     ? ['fixtures', 'bracket', 'teams', 'chat', 'info']
     : ['standings', 'fixtures', 'bracket', 'teams', 'chat', 'info']
 
@@ -219,13 +219,16 @@ export default function TournamentPage() {
                 ])
             })
             .then(([s, f, tm, m, g]) => {
-                setStandings(s.data.standings)
-                setFixtures(f.data.matches)
-                setTeams(tm.data.teams)
-                setMessages(m.data.messages)
-                setGroups(g.data.groups)
+                setStandings(s.data.standings || [])
+                setFixtures(f.data.fixtures || [])  // ← FIXED: was .matches
+                setTeams(tm.data.teams || [])
+                setMessages(m.data.messages || [])
+                setGroups(g.data.groups || [])
             })
-            .catch(console.error)
+            .catch(err => {
+                console.error('Load error:', err)
+                setLoading(false)
+            })
             .finally(() => setLoading(false))
     }, [slug])
 
@@ -245,7 +248,7 @@ export default function TournamentPage() {
 
     useEffect(() => {
         if (!tournament) return
-        if (tournament.format === 'single_elim' && tab === 'standings') {
+        if (tournament.format === 'single_elimination' && tab === 'standings') {
             setTab('fixtures')
         }
     }, [tournament, tab])
