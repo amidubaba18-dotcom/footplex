@@ -91,6 +91,42 @@ app.get('/api/tournaments', async (request) => {
     )
     return { tournaments: res.rows }
 })
+app.post('/api/tournaments/:id/generate', { preHandler: authenticate }, async (request, reply) => {
+    const tournament_id = parseInt(request.params.id)
+    const tournament = await pool.query('SELECT * FROM tournaments WHERE id=$1 AND organizer_id=$2', [tournament_id, request.user.id])
+
+    if (tournament.rows.length === 0) return reply.status(403).send({ error: 'Not authorized' })
+
+    const t = tournament.rows[0]
+    const teamsRes = await pool.query('SELECT id FROM teams WHERE tournament_id=$1 AND status=$2', [tournament_id, 'confirmed'])
+    const teams = teamsRes.rows
+
+    if (teams.length < 2) return reply.status(400).send({ error: 'Need at least 2 teams' })
+
+    let matchesData = []
+
+    if (t.format === 'round_robin') {
+        const { generateRoundRobin } = await import('./tournament-engine/roundRobin.js')
+        matchesData = generateRoundRobin(teams)
+    } else if (t.format === 'single_elimination') {
+        const { generateSingleElimination } = await import('./tournament-engine/singleElimination.js')
+        matchesData = generateSingleElimination(teams)
+    } else if (t.format === 'double_elimination') {
+        const { generateDoubleElimination } = await import('./tournament-engine/doubleElimination.js')
+        matchesData = generateDoubleElimination(teams)
+    }
+
+    for (const match of matchesData) {
+        await pool.query(
+            `INSERT INTO matches (tournament_id, home_team_id, away_team_id, round_number, status, match_type, match_number, is_placeholder)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+            [tournament_id, match.home_team_id, match.away_team_id, match.round_number, 'scheduled', match.match_type || 'group', match.match_number, match.is_placeholder || false]
+        )
+    }
+
+    await pool.query('UPDATE tournaments SET status=$1 WHERE id=$2', ['active', tournament_id])
+    return { message: 'Fixtures generated', count: matchesData.length }
+})
 
 app.get('/api/tournaments/:slug', async (request) => {
     const res = await pool.query('SELECT * FROM tournaments WHERE slug=$1', [request.params.slug])
