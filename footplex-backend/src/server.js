@@ -466,6 +466,47 @@ app.post('/api/tournaments/:id/messages', async (request, reply) => {
 
     return { message: result.rows[0] }
 })
+
+app.get('/api/tournaments/:id/groups', async (request, reply) => {
+    const tournament_id = parseInt(request.params.id)
+
+    // Get all teams grouped by their group assignment
+    const result = await pool.query(
+        `SELECT 
+            COALESCE(m.group_name, 'A') as group_name,
+            t.id,
+            t.name,
+            COUNT(CASE WHEN m.status = 'completed' THEN 1 END) as played,
+            SUM(CASE WHEN m.status = 'completed' AND m.winner_team_id = t.id THEN 1 ELSE 0 END) as won,
+            SUM(CASE WHEN m.status = 'completed' AND m.home_score = m.away_score AND (m.home_team_id = t.id OR m.away_team_id = t.id) THEN 1 ELSE 0 END) as drawn,
+            SUM(CASE WHEN m.status = 'completed' AND m.winner_team_id != t.id AND (m.home_team_id = t.id OR m.away_team_id = t.id) THEN 1 ELSE 0 END) as lost,
+            COALESCE(SUM(CASE WHEN m.home_team_id = t.id THEN m.home_score ELSE m.away_score END), 0) - 
+            COALESCE(SUM(CASE WHEN m.home_team_id = t.id THEN m.away_score ELSE m.home_score END), 0) as goal_difference,
+            SUM(CASE WHEN m.status = 'completed' AND m.winner_team_id = t.id THEN 3 ELSE 0 END) +
+            SUM(CASE WHEN m.status = 'completed' AND m.home_score = m.away_score AND (m.home_team_id = t.id OR m.away_team_id = t.id) THEN 1 ELSE 0 END) as points
+         FROM teams t
+         LEFT JOIN matches m ON (m.home_team_id = t.id OR m.away_team_id = t.id) AND m.tournament_id = $1
+         WHERE t.tournament_id = $1
+         GROUP BY group_name, t.id, t.name
+         ORDER BY group_name, points DESC, goal_difference DESC`,
+        [tournament_id]
+    )
+
+    // Group by group_name
+    const grouped = {}
+    result.rows.forEach(team => {
+        if (!grouped[team.group_name]) {
+            grouped[team.group_name] = {
+                name: team.group_name,
+                standings: []
+            }
+        }
+        grouped[team.group_name].standings.push(team)
+    })
+
+    const groups = Object.values(grouped)
+    return { groups }
+})
 // Error handler
 app.setErrorHandler((error, request, reply) => {
     console.error(error)

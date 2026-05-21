@@ -1,15 +1,24 @@
-export function generateRoundRobin(teams) {
+function generateRoundRobin(teams) {
     const matches = []
-    const list = teams.length % 2 !== 0 ? [...teams, { id: null }] : [...teams]
-    const total = list.length
-    const rounds = total - 1
-    const half = total / 2
 
-    for (let round = 0; round < rounds; round++) {
-        for (let i = 0; i < half; i++) {
+    // Add BYE if odd number of teams
+    const list =
+        teams.length % 2 === 0
+            ? [...teams]
+            : [...teams, { id: null }]
+
+    const totalTeams = list.length
+    const totalRounds = totalTeams - 1
+    const matchesPerRound = totalTeams / 2
+
+    for (let round = 0; round < totalRounds; round++) {
+
+        for (let i = 0; i < matchesPerRound; i++) {
             const home = list[i]
-            const away = list[total - 1 - i]
-            if (home.id !== null && away.id !== null) {
+            const away = list[totalTeams - 1 - i]
+
+            // Skip BYE matches
+            if (home.id && away.id) {
                 matches.push({
                     round_number: round + 1,
                     home_team_id: home.id,
@@ -18,8 +27,15 @@ export function generateRoundRobin(teams) {
                 })
             }
         }
-        const last = list.splice(total - 1, 1)[0]
-        list.splice(1, 0, last)
+
+        // Rotate teams except first one
+        const fixed = list[0]
+        const rotating = list.slice(1)
+
+        rotating.unshift(rotating.pop())
+
+        list.splice(0, list.length, fixed, ...rotating)
     }
+
     return matches
 }
