@@ -189,13 +189,17 @@ app.patch('/api/tournaments/:id/teams/:teamId', { preHandler: authenticate }, as
 // ========== FIXTURES ROUTES ==========
 app.post('/api/tournaments/:id/generate', { preHandler: authenticate }, async (request, reply) => {
     const tournament_id = parseInt(request.params.id)
-    const tournament = await pool.query('SELECT * FROM tournaments WHERE id=$1 AND organizer_id=$2', [tournament_id, request.user.id])
+    console.log('🔵 Generating for tournament:', tournament_id)
 
+    const tournament = await pool.query('SELECT * FROM tournaments WHERE id=$1 AND organizer_id=$2', [tournament_id, request.user.id])
     if (tournament.rows.length === 0) return reply.status(403).send({ error: 'Not authorized' })
 
     const t = tournament.rows[0]
+    console.log('📋 Tournament format:', t.format)
+
     const teamsRes = await pool.query('SELECT id FROM teams WHERE tournament_id=$1 AND status=$2', [tournament_id, 'confirmed'])
     const teams = teamsRes.rows
+    console.log('👥 Found teams:', teams.length)
 
     if (teams.length < 2) return reply.status(400).send({ error: 'Need at least 2 teams' })
 
@@ -211,16 +215,32 @@ app.post('/api/tournaments/:id/generate', { preHandler: authenticate }, async (r
         matchesData = generateSwiss(teams)
     }
 
+    console.log('🎯 Generated matches:', matchesData.length)
+    console.log('First match:', matchesData[0])
+
+    // Delete existing matches first
+    await pool.query('DELETE FROM matches WHERE tournament_id=$1', [tournament_id])
+
+    // Insert new matches with error handling
+    let insertedCount = 0
     for (const match of matchesData) {
-        await pool.query(
-            `INSERT INTO matches (tournament_id, home_team_id, away_team_id, round_number, status, match_type, match_number, is_placeholder)
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-            [tournament_id, match.home_team_id, match.away_team_id, match.round_number, 'scheduled', match.match_type || 'group', match.match_number, match.is_placeholder || false]
-        )
+        try {
+            await pool.query(
+                `INSERT INTO matches (tournament_id, home_team_id, away_team_id, round_number, status, match_type, match_number, is_placeholder)
+                 VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+                [tournament_id, match.home_team_id, match.away_team_id, match.round_number, 'scheduled', match.match_type || 'group', match.match_number, match.is_placeholder || false]
+            )
+            insertedCount++
+        } catch (err) {
+            console.error('❌ Insert error:', err.message, 'Match:', match)
+            throw err
+        }
     }
 
+    console.log('✅ Inserted matches:', insertedCount)
+
     await pool.query('UPDATE tournaments SET status=$1 WHERE id=$2', ['active', tournament_id])
-    return { message: 'Fixtures generated', count: matchesData.length }
+    return { message: 'Fixtures generated', count: insertedCount }
 })
 
 app.get('/api/tournaments/:id/fixtures', async (request, reply) => {
