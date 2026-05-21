@@ -441,6 +441,31 @@ function generateGroupKnockout(teams) {
     return matches
 }
 
+
+app.get('/api/tournaments/:id/messages', async (request, reply) => {
+    const tournament_id = parseInt(request.params.id)
+    const result = await pool.query(
+        'SELECT * FROM messages WHERE tournament_id=$1 ORDER BY created_at DESC LIMIT 50',
+        [tournament_id]
+    )
+    return { messages: result.rows }
+})
+
+app.post('/api/tournaments/:id/messages', async (request, reply) => {
+    const { sender_name, content } = request.body
+    const tournament_id = parseInt(request.params.id)
+
+    if (!sender_name?.trim() || !content?.trim()) {
+        return reply.status(400).send({ error: 'Name and message required' })
+    }
+
+    const result = await pool.query(
+        'INSERT INTO messages (tournament_id, sender_name, content) VALUES ($1,$2,$3) RETURNING *',
+        [tournament_id, sender_name.trim(), content.trim()]
+    )
+
+    return { message: result.rows[0] }
+})
 // Error handler
 app.setErrorHandler((error, request, reply) => {
     console.error(error)
