@@ -16,7 +16,7 @@ export default function CreateTournament() {
         end_date: '',
     })
 
-    
+
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
 
@@ -118,6 +118,8 @@ export default function CreateTournament() {
                                     <option value="single_elim">Single Elimination</option>
                                     <option value="group_knockout">Group + Knockout</option>
                                     <option value="swiss">Swiss System</option>
+                                    <option value="double_elim"> Double Elimination</option>
+
                                 </select>
                             </div>
                         </div>
