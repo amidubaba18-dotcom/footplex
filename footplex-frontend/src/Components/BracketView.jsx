@@ -17,18 +17,22 @@ function MatchCard({ match, accentClass = 'border-gray-200' }) {
     const homeWon = match.winner_team_id === match.home_team_id;
     const awayWon = match.winner_team_id === match.away_team_id;
     const isDone = match.status === 'completed';
+    const hasPenalties = match.home_penalty_score !== null || match.away_penalty_score !== null;
 
     return (
-        <div className={`w - 56 rounded-xl overflow-hidden border shadow-sm ${accentClass}`}>
-            <div className={`flex items-center justify-between px-3 py-2.5 border - b ${homeWon ? 'bg-brand-50 border-brand-100' : 'border-gray-100'}`}>
+        <div className={`w-56 rounded-xl overflow-hidden border shadow-sm ${accentClass}`}>
+            <div className={`flex items-center justify-between px-3 py-2.5 border-b ${homeWon ? 'bg-brand-50 border-brand-100' : 'border-gray-100'}`}>
                 <span className={`text-sm truncate flex-1 ${homeName === 'TBD' ? 'text-gray-300 italic' : homeName === 'BYE' ? 'text-gray-400 italic' : homeWon ? 'font-bold text-brand-600' : isDone ? 'text-gray-400' : 'font-medium text-gray-900'}`}>
                     {homeName}
                 </span>
                 <div className="flex items-center gap-1 ml-2">
                     {isDone && (
-                        <span className={`text-sm font-bold w-5 text-right ${homeWon ? 'text-brand-600' : 'text-gray-400'}`}>
-                            {match.home_score}
-                        </span>
+                        <div className="flex flex-col items-end">
+                            <span className={`text-sm font-bold ${homeWon ? 'text-brand-600' : 'text-gray-400'}`}>
+                                {match.home_score}
+                            </span>
+                            {hasPenalties && <span className="text-[10px] text-gray-400">({match.home_penalty_score})</span>}
+                        </div>
                     )}
                     {homeWon && <span className="text-brand-500 text-xs">✓</span>}
                 </div >
@@ -39,9 +43,12 @@ function MatchCard({ match, accentClass = 'border-gray-200' }) {
                 </span>
                 <div className="flex items-center gap-1 ml-2">
                     {isDone && (
-                        <span className={`text-sm font-bold w-5 text-right ${awayWon ? 'text-brand-600' : 'text-gray-400'}`}>
-                            {match.away_score}
-                        </span>
+                        <div className="flex flex-col items-end">
+                            <span className={`text-sm font-bold ${awayWon ? 'text-brand-600' : 'text-gray-400'}`}>
+                                {match.away_score}
+                            </span>
+                            {hasPenalties && <span className="text-[10px] text-gray-400">({match.away_penalty_score})</span>}
+                        </div>
                     )}
                     {awayWon && <span className="text-brand-500 text-xs">✓</span>}
                 </div >
@@ -72,7 +79,7 @@ function BracketSection({ title, rounds, roundName, accentClass = 'bg-gray-100 t
                 <div className="flex gap-8 min-w-max items-start">
                     {rounds.map(round => (
                         <div key={`${title}-${round.roundNumber}`} className="flex flex-col gap-3">
-                            <div className={`text - center px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wide ${accentClass}`}>
+                            <div className={`text-center px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wide ${accentClass}`}>
                                 {roundName(round.roundNumber, rounds.length)}
                             </div>
                             <div className="flex flex-col gap-6 justify-around" style={{ minHeight: `${Math.max(round.matches.length, 1) * 92}px` }}>

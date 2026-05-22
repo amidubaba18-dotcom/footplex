@@ -1,4 +1,4 @@
-import pool from './plugins/db.js'; // Corrected path for clarity and consistency
+import pool from './plugins/db.js';
 
 export const MatchService = {
     isKnockout(matchType) {
