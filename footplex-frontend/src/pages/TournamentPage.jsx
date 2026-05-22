@@ -465,7 +465,7 @@ export default function TournamentPage() {
                                         <table className="w-full text-sm">
                                             <thead className="bg-gray-50 border-b border-gray-100">
                                                 <tr>
-                                                    {['#', 'Team', 'P', 'W', 'D', 'L', 'GD', 'Pts'].map((h, i) => (
+                                                    {['#', 'Team', 'P', 'W', 'D', 'L', 'GD', 'AG', 'Pts'].map((h, i) => (
                                                         <th key={h} className={`py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide ${i === 1 ? 'text-left' : 'text-center'}`}>
                                                             {h}
                                                         </th>
@@ -487,6 +487,7 @@ export default function TournamentPage() {
                                                             <td className="py-3 px-4 text-center text-gray-500">{team.drawn || 0}</td>
                                                             <td className="py-3 px-4 text-center text-gray-500">{team.lost || 0}</td>
                                                             <td className="py-3 px-4 text-center text-gray-500">{team.goal_difference || 0}</td>
+                                                            <td className="py-3 px-4 text-center text-gray-400 italic">{team.goals_away || 0}</td>
                                                             <td className="py-3 px-4 text-center font-bold text-gray-900">{team.points || 0}</td>
                                                         </tr>
                                                     )
@@ -504,7 +505,7 @@ export default function TournamentPage() {
                                     <table className="w-full text-sm">
                                         <thead className="bg-gray-50 border-b border-gray-200">
                                             <tr>
-                                                {['#', 'Team', 'P', 'W', 'D', 'L', 'GD', 'Pts'].map((h, i) => (
+                                                {['#', 'Team', 'P', 'W', 'D', 'L', 'GD', 'AG', 'Pts'].map((h, i) => (
                                                     <th key={h} className={`py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide ${i === 1 ? 'text-left' : 'text-center'}`}>
                                                         {h}
                                                     </th>
@@ -521,6 +522,7 @@ export default function TournamentPage() {
                                                     <td className="py-3 px-4 text-center text-gray-500">{team.drawn || 0}</td>
                                                     <td className="py-3 px-4 text-center text-gray-500">{team.lost || 0}</td>
                                                     <td className="py-3 px-4 text-center text-gray-500">{team.goal_difference || 0}</td>
+                                                    <td className="py-3 px-4 text-center text-gray-400 italic">{team.goals_away || 0}</td>
                                                     <td className="py-3 px-4 text-center font-bold text-gray-900">{team.points || 0}</td>
                                                 </tr>
                                             ))}

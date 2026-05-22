@@ -12,8 +12,10 @@ export default function CreateTournament() {
         group_count: '2',
         teams_advance: '2',
         description: '',
+        is_two_legged_knockout: false,
         start_date: '',
         end_date: '',
+        is_double_round_robin: false
     })
 
 
@@ -21,7 +23,11 @@ export default function CreateTournament() {
     const [error, setError] = useState('')
 
     function handleChange(e) {
-        setForm(f => ({ ...f, [e.target.name]: e.target.value }))
+        const { name, value, type, checked } = e.target;
+        setForm(f => ({
+            ...f,
+            [name]: type === 'checkbox' ? checked : value
+        }))
     }
 
     async function handleSubmit(e) {
@@ -125,6 +131,38 @@ export default function CreateTournament() {
                             </div>
                         </div>
 
+                        {(form.format === 'round_robin' || form.format === 'free_for_all') && (
+                            <div className="flex items-center gap-3 p-3 bg-brand-50 rounded-lg border border-brand-100">
+                                <input
+                                    type="checkbox"
+                                    name="is_double_round_robin"
+                                    id="is_double_round_robin"
+                                    checked={form.is_double_round_robin}
+                                    onChange={handleChange}
+                                    className="w-4 h-4 text-brand-600 rounded border-gray-300 focus:ring-brand-500"
+                                />
+                                <label htmlFor="is_double_round_robin" className="text-sm font-medium text-brand-900">
+                                    Double Round Robin (Home & Away)
+                                </label>
+                                <p className="text-[10px] text-brand-600 ml-auto italic">Teams play each other twice</p>
+                            </div>
+                        )}
+
+                        {BRACKET_FORMATS.has(form.format) && (
+                            <div className="flex items-center gap-3 p-3 bg-brand-50 rounded-lg border border-brand-100">
+                                <input
+                                    type="checkbox"
+                                    name="is_two_legged_knockout"
+                                    id="is_two_legged_knockout"
+                                    checked={form.is_two_legged_knockout}
+                                    onChange={handleChange}
+                                    className="w-4 h-4 text-brand-600 rounded border-gray-300 focus:ring-brand-500"
+                                />
+                                <label htmlFor="is_two_legged_knockout" className="text-sm font-medium text-brand-900">
+                                    Two-Legged Knockout (Home & Away)
+                                </label>
+                            </div>
+                        )}
                         {form.format === 'group_knockout' && (
                             <div className="grid grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
                                 <div>
