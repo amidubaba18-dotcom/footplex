@@ -72,7 +72,7 @@ function BracketSection({ title, rounds, roundName, accentClass = 'bg-gray-100 t
                 <div className="flex gap-8 min-w-max items-start">
                     {rounds.map(round => (
                         <div key={`${title}-${round.roundNumber}`} className="flex flex-col gap-3">
-                            [22/05/2026 18:30] Nitro Lenz: <div className={`text - center px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wide ${accentClass}`}>
+                            <div className={`text - center px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wide ${accentClass}`}>
                                 {roundName(round.roundNumber, rounds.length)}
                             </div>
                             <div className="flex flex-col gap-6 justify-around" style={{ minHeight: `${Math.max(round.matches.length, 1) * 92}px` }}>

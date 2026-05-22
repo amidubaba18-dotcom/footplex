@@ -115,6 +115,7 @@ export default function CreateTournament() {
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Format</label>
                                 <select name="format" value={form.format} onChange={handleChange} className="input">
                                     <option value="round_robin">Round Robin</option>
+                                    <option value="free_for_all">Free For All</option>
                                     <option value="single_elim">Single Elimination</option>
                                     <option value="group_knockout">Group + Knockout</option>
                                     <option value="swiss">Swiss System</option>

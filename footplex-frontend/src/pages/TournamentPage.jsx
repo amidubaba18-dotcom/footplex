@@ -190,6 +190,7 @@ const BRACKET_FORMATS = new Set([
 const STANDINGS_FORMATS = new Set([
     'round_robin',
     'swiss',
+    'free_for_all', // Free for all will also display standings
     'group_knockout'
 ])
 

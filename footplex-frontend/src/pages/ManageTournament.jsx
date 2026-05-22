@@ -130,6 +130,8 @@ const BRACKET_FORMATS = new Set([
 const getTabs = (format) => {
     const tabs = ['teams', 'fixtures']
 
+    if (format === 'free_for_all') tabs.push('standings') // Free for all will also display standings
+
     if (BRACKET_FORMATS.has(format)) {
         tabs.push('bracket')
     }
@@ -490,39 +492,39 @@ export default function ManageTournament() {
                                 })
 
                                 return sections.map(section => (
-                                        <div key={section.key}>
-                                            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
-                                                {section.label}
-                                            </p>
-                                            <div className="space-y-2">
-                                                {section.matches.map(match => (
-                                                    <div key={match.id} className="card">
-                                                        <div className="flex items-center justify-between gap-3">
-                                                            <span className={`font-medium text-sm flex-1 ${match.winner_team_id === match.home_team_id ? 'text-brand-500 font-bold' : 'text-gray-900'
-                                                                }`}>
-                                                                {match.home_team_name || 'TBD'}
-                                                            </span>
-                                                            <div className="text-center px-4">
-                                                                {match.status === 'completed' ? (
-                                                                    <span className="font-bold text-gray-900">
-                                                                        {match.home_score} – {match.away_score}
-                                                                    </span>
-                                                                ) : match.is_placeholder ? (
-                                                                    <span className="text-xs text-gray-300 bg-gray-50 px-3 py-1 rounded-full">TBD</span>
-                                                                ) : (
-                                                                    <span className="text-xs text-gray-400 bg-gray-100 px-3 py-1 rounded-full">vs</span>
-                                                                )}
-                                                            </div>
-                                                            <span className={`font-medium text-sm flex-1 text-right ${match.winner_team_id === match.away_team_id ? 'text-brand-500 font-bold' : 'text-gray-900'
-                                                                }`}>
-                                                                {match.away_team_name || 'TBD'}
-                                                            </span>
+                                    <div key={section.key}>
+                                        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+                                            {section.label}
+                                        </p>
+                                        <div className="space-y-2">
+                                            {section.matches.map(match => (
+                                                <div key={match.id} className="card">
+                                                    <div className="flex items-center justify-between gap-3">
+                                                        <span className={`font-medium text-sm flex-1 ${match.winner_team_id === match.home_team_id ? 'text-brand-500 font-bold' : 'text-gray-900'
+                                                            }`}>
+                                                            {match.home_team_name || 'TBD'}
+                                                        </span>
+                                                        <div className="text-center px-4">
+                                                            {match.status === 'completed' ? (
+                                                                <span className="font-bold text-gray-900">
+                                                                    {match.home_score} – {match.away_score}
+                                                                </span>
+                                                            ) : match.is_placeholder ? (
+                                                                <span className="text-xs text-gray-300 bg-gray-50 px-3 py-1 rounded-full">TBD</span>
+                                                            ) : (
+                                                                <span className="text-xs text-gray-400 bg-gray-100 px-3 py-1 rounded-full">vs</span>
+                                                            )}
                                                         </div>
+                                                        <span className={`font-medium text-sm flex-1 text-right ${match.winner_team_id === match.away_team_id ? 'text-brand-500 font-bold' : 'text-gray-900'
+                                                            }`}>
+                                                            {match.away_team_name || 'TBD'}
+                                                        </span>
                                                     </div>
-                                                ))}
-                                            </div>
+                                                </div>
+                                            ))}
                                         </div>
-                                    ))
+                                    </div>
+                                ))
                             })()
                         )}
                     </div>

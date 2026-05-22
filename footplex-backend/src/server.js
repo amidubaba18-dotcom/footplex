@@ -16,6 +16,7 @@ const SINGLE_ELIM_FORMATS = new Set(['single_elim', 'single_elimination'])
 const DOUBLE_ELIM_FORMATS = new Set(['double_elim', 'double_elimination'])
 const KNOCKOUT_MATCH_TYPES = new Set([
     'knockout',
+    'free_for_all', // Added free_for_all as a match type if it's considered a distinct type of match
     'winners',
     'losers',
     'grand_final',
@@ -36,6 +37,7 @@ const authenticate = async (request, reply) => {
 function normalizeFormat(format) {
     if (SINGLE_ELIM_FORMATS.has(format)) return 'single_elim'
     if (DOUBLE_ELIM_FORMATS.has(format)) return 'double_elim'
+    if (format === 'free_for_all') return 'free_for_all' // Normalize new format
     return format
 }
 
@@ -854,6 +856,8 @@ app.post('/api/tournaments/:id/generate', { preHandler: authenticate }, async (r
     let clearExisting = format !== 'swiss'
 
     if (format === 'round_robin') {
+        matches = generateRoundRobin(teams)
+    } else if (format === 'free_for_all') { // New format using existing round robin logic
         matches = generateRoundRobin(teams)
     } else if (format === 'single_elim') {
         matches = generateSingleElimination(teams)
