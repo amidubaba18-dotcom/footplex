@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import api from '../lib/api'
 import SharedBracketView from '../Components/BracketView'
+import GroupsView from '../Components/GroupsView'
 import { getFixtureLabel, getPublicTournamentTabs } from '../lib/tournamentFormat'
 
 function MatchCard({ match, isFinal }) {

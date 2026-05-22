@@ -1,8 +1,8 @@
 import Fastify from 'fastify'
 import cors from '@fastify/cors'
-import { Pool } from 'pg'
 import jwt from '@fastify/jwt'
 import bcrypt from 'bcrypt'
+import pool from './plugins/db.js'
 
 import { generateRoundRobin } from './tournament-engine/roundRobin.js'
 import { generateSingleElimination } from './tournament-engine/singleElimination.js'
@@ -11,10 +11,6 @@ import { generateSwissRound, getSwissRounds } from './tournament-engine/swiss.js
 import { generateGroups, generateGroupMatches } from './tournament-engine/groupKnockout.js'
 
 const app = Fastify()
-const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false }
-})
 
 const SINGLE_ELIM_FORMATS = new Set(['single_elim', 'single_elimination'])
 const DOUBLE_ELIM_FORMATS = new Set(['double_elim', 'double_elimination'])
@@ -25,8 +21,6 @@ const KNOCKOUT_MATCH_TYPES = new Set([
     'grand_final',
     'grand_final_reset'
 ])
-
-pool.on('error', err => console.error('Pool error:', err.message))
 
 await app.register(cors, { origin: '*', credentials: true, methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'] })
 await app.register(jwt, { secret: process.env.JWT_SECRET })
@@ -866,12 +860,16 @@ app.post('/api/tournaments/:id/generate', { preHandler: authenticate }, async (r
     } else if (format === 'double_elim') {
         matches = generateDoubleElimination(teams)
     } else if (format === 'group_knockout') {
-        const groupCount = Math.max(2, parseInt(tournament.group_count, 10) || 2)
-        const groups = generateGroups(teams, groupCount)
-        matches = generateGroupMatches(groups).map((match, index) => ({
-            ...match,
-            match_number: (index % 1000) + 1
-        }))
+        const groupCount = Math.max(2, parseInt(tournament.group_count, 10) || 2);
+        const groups = generateGroups(teams, groupCount);
+        const groupMatches = generateGroupMatches(groups);
+
+        // Clear existing matches only for group stage
+        await pool.query('DELETE FROM matches WHERE tournament_id=$1 AND group_name IS NOT NULL', [tournamentId]);
+
+        matches = groupMatches;
+        clearExisting = false;
+        // Actually group_knockout starts with only group matches, no knockout yet.
     } else if (format === 'swiss') {
         const existingMatchesResult = await pool.query(
             `SELECT *
@@ -909,6 +907,8 @@ app.post('/api/tournaments/:id/generate', { preHandler: authenticate }, async (r
         await pool.query('DELETE FROM matches WHERE tournament_id=$1', [tournamentId])
     }
 
+    // Note: Ideally insertMatches should happen within a transaction
+
     const inserted = await insertMatches(tournament, matches)
 
     await pool.query('UPDATE tournaments SET status=$1 WHERE id=$2', ['active', tournamentId])
@@ -918,7 +918,7 @@ app.post('/api/tournaments/:id/generate', { preHandler: authenticate }, async (r
         count: inserted.length,
         fixtures: inserted
     }
-})
+});
 
 app.get('/api/tournaments/:id/fixtures', async request => {
     const tournamentId = parseInt(request.params.id, 10)
@@ -962,35 +962,39 @@ app.patch('/api/tournaments/:id/matches/:matchId/score', { preHandler: authentic
     const tournament = await getTournamentForOwner(tournamentId, request.user.id)
     if (!tournament) return reply.status(403).send({ error: 'Not authorized' })
 
-    const matchResult = await pool.query(
-        'SELECT * FROM matches WHERE id=$1 AND tournament_id=$2',
-        [matchId, tournamentId]
-    )
-    if (matchResult.rows.length === 0) return reply.status(404).send({ error: 'Match not found' })
+    // Using a single client for potential transaction consistency
+    const client = await pool.connect()
+    try {
+        const matchResult = await client.query(
+            'SELECT * FROM matches WHERE id=$1 AND tournament_id=$2',
+            [matchId, tournamentId]
+        )
+        if (matchResult.rows.length === 0) return reply.status(404).send({ error: 'Match not found' })
 
-    const match = matchResult.rows[0]
-    if (match.status === 'completed') {
-        return reply.status(400).send({ error: 'Match already completed' })
-    }
+        const match = matchResult.rows[0]
+        if (match.status === 'completed') {
+            return reply.status(400).send({ error: 'Match already completed' })
+        }
 
-    const format = normalizeFormat(tournament.format)
-    const knockoutDraw =
-        isDraw(home_score, away_score) &&
-        (format === 'single_elim' || format === 'double_elim' || (format === 'group_knockout' && isKnockoutMatch(match)))
+        const format = normalizeFormat(tournament.format)
+        const knockoutDraw =
+            isDraw(home_score, away_score) &&
+            (format === 'single_elim' || format === 'double_elim' || (format === 'group_knockout' && isKnockoutMatch(match)))
 
-    if (knockoutDraw) {
-        return reply.status(400).send({ error: 'Knockout matches cannot end in a draw' })
-    }
+        if (knockoutDraw) {
+            return reply.status(400).send({ error: 'Knockout matches cannot end in a draw' })
+        }
 
-    let winnerTeamId = null
-    if (parseInt(home_score, 10) > parseInt(away_score, 10)) {
-        winnerTeamId = match.home_team_id
-    } else if (parseInt(away_score, 10) > parseInt(home_score, 10)) {
-        winnerTeamId = match.away_team_id
-    }
+        let winnerTeamId = null
+        if (parseInt(home_score, 10) > parseInt(away_score, 10)) {
+            winnerTeamId = match.home_team_id
+        } else if (parseInt(away_score, 10) > parseInt(home_score, 10)) {
+            winnerTeamId = match.away_team_id
+        }
 
-    const updatedResult = await pool.query(
-        `UPDATE matches
+        await client.query('BEGIN')
+        const updatedResult = await client.query(
+            `UPDATE matches
          SET home_score=$1,
              away_score=$2,
              status='completed',
@@ -998,37 +1002,44 @@ app.patch('/api/tournaments/:id/matches/:matchId/score', { preHandler: authentic
              played_at=NOW()
          WHERE id=$4
          RETURNING *`,
-        [parseInt(home_score, 10), parseInt(away_score, 10), winnerTeamId, matchId]
-    )
+            [parseInt(home_score, 10), parseInt(away_score, 10), winnerTeamId, matchId]
+        )
 
-    const updatedMatch = updatedResult.rows[0]
-    const loserTeamId = getLoserTeamId(updatedMatch, winnerTeamId)
+        const updatedMatch = updatedResult.rows[0]
+        const loserTeamId = getLoserTeamId(updatedMatch, winnerTeamId)
 
-    if (format === 'single_elim' && winnerTeamId != null) {
-        const hasNext = await advanceSingleEliminationWinner(tournamentId, updatedMatch, winnerTeamId)
-        if (!hasNext) {
-            await markTournamentCompleted(tournamentId)
-        }
-    }
-
-    if (format === 'double_elim' && winnerTeamId != null) {
-        await processDoubleEliminationResult(tournamentId, updatedMatch, winnerTeamId, loserTeamId)
-    }
-
-    if (format === 'group_knockout') {
-        if (updatedMatch.group_name) {
-            await maybeCreateGroupKnockoutStage(tournament)
-        } else if (winnerTeamId != null) {
+        if (format === 'single_elim' && winnerTeamId != null) {
             const hasNext = await advanceSingleEliminationWinner(tournamentId, updatedMatch, winnerTeamId)
             if (!hasNext) {
                 await markTournamentCompleted(tournamentId)
             }
         }
+
+        if (format === 'double_elim' && winnerTeamId != null) {
+            await processDoubleEliminationResult(tournamentId, updatedMatch, winnerTeamId, loserTeamId)
+        }
+
+        if (format === 'group_knockout') {
+            if (updatedMatch.group_name) {
+                await maybeCreateGroupKnockoutStage(tournament)
+            } else if (winnerTeamId != null) {
+                const hasNext = await advanceSingleEliminationWinner(tournamentId, updatedMatch, winnerTeamId)
+                if (!hasNext) {
+                    await markTournamentCompleted(tournamentId)
+                }
+            }
+        }
+
+        await maybeCompleteLeagueTournament(tournamentId, format)
+        await client.query('COMMIT')
+
+        return { message: 'Score recorded', match: updatedMatch }
+    } catch (err) {
+        await client.query('ROLLBACK')
+        throw err
+    } finally {
+        client.release()
     }
-
-    await maybeCompleteLeagueTournament(tournamentId, format)
-
-    return { message: 'Score recorded', match: updatedMatch }
 })
 
 app.get('/api/tournaments/:id/standings', async request => {
