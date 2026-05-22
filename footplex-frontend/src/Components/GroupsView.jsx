@@ -1,6 +1,5 @@
 // src/components/GroupsView.jsx
 import { useEffect, useState } from 'react';
-import { supabase } from '../lib/supabase';
 
 export default function GroupsView({ tournamentId }) {
     const [groups, setGroups] = useState([]);
