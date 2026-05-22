@@ -2,6 +2,14 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../lib/api'
 
+const BRACKET_FORMATS = new Set([
+    'single_elim',
+    'single_elimination',
+    'double_elim',
+    'double_elimination',
+    'group_knockout'
+])
+
 export default function CreateTournament() {
     const navigate = useNavigate()
     const [form, setForm] = useState({
