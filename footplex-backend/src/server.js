@@ -10,6 +10,37 @@ import { generateDoubleElimination } from './tournament-engine/doubleElimination
 import { generateSwissRound, getSwissRounds } from './tournament-engine/swiss.js'
 import { generateGroups, generateGroupMatches } from './tournament-engine/groupKnockout.js'
 
+// Industrial Input Validation Schemas
+const tournamentSchema = {
+    body: {
+        type: 'object',
+        required: ['name', 'tournament_type', 'format', 'max_teams'],
+        properties: {
+            name: { type: 'string', minLength: 3 },
+            tournament_type: { enum: ['physical', 'efootball', 'futsal'] },
+            format: { type: 'string' },
+            max_teams: { type: 'integer', minimum: 2 },
+            group_count: { type: 'integer', minimum: 2 },
+            teams_advance_per_group: { type: 'integer', minimum: 1 },
+            is_double_round_robin: { type: 'boolean' },
+            is_two_legged_knockout: { type: 'boolean' }
+        }
+    }
+}
+
+const scoreSchema = {
+    body: {
+        type: 'object',
+        required: ['home_score', 'away_score'],
+        properties: {
+            home_score: { type: 'integer', minimum: 0 },
+            away_score: { type: 'integer', minimum: 0 },
+            home_penalty_score: { type: 'integer', minimum: 0 },
+            away_penalty_score: { type: 'integer', minimum: 0 }
+        }
+    }
+}
+
 const app = Fastify()
 
 const SINGLE_ELIM_FORMATS = new Set(['single_elim', 'single_elimination'])
@@ -509,12 +540,26 @@ async function maybeCreateGroupKnockoutStage(tournament, db = pool) {
                 position: index + 1
             }))
         )
-        .sort((a, b) => {
-            if (a.position !== b.position) return a.position - b.position
-            return a.group_name.localeCompare(b.group_name)
-        })
 
-    if (advancingTeams.length < 2) {
+    // IMPROVED SEEDING: Standard A1 vs B2, B1 vs A2 logic
+    // This reorders the teams so the generator pairs Winner of one group with Runner-up of another
+    const seededTeams = [];
+    if (advancePerGroup === 2 && advancingTeams.length % 4 === 0) {
+        for (let i = 0; i < advancingTeams.length; i += 4) {
+            const a1 = advancingTeams.find(t => t.group_name === groups[i]?.name && t.position === 1);
+            const b2 = advancingTeams.find(t => t.group_name === groups[i + 1]?.name && t.position === 2);
+            const b1 = advancingTeams.find(t => t.group_name === groups[i + 1]?.name && t.position === 1);
+            const a2 = advancingTeams.find(t => t.group_name === groups[i]?.name && t.position === 2);
+            if (a1) seededTeams.push(a1);
+            if (b2) seededTeams.push(b2);
+            if (b1) seededTeams.push(b1);
+            if (a2) seededTeams.push(a2);
+        }
+    }
+
+    const finalEntrants = seededTeams.length > 0 ? seededTeams : advancingTeams;
+
+    if (finalEntrants.length < 2) {
         await markTournamentCompleted(tournament.id)
         return []
     }
@@ -528,7 +573,7 @@ async function maybeCreateGroupKnockoutStage(tournament, db = pool) {
     )
     const startingRound = parseInt(roundResult.rows[0].max_round, 10) + 1
     const knockoutMatches = generateSingleElimination(
-        advancingTeams,
+        finalEntrants,
         { startingRound, matchType: 'knockout' }
     )
 
@@ -536,70 +581,80 @@ async function maybeCreateGroupKnockoutStage(tournament, db = pool) {
 }
 
 async function insertMatches(tournament, matches, db = pool) {
+    // If db is the pool, we should connect and start a transaction
+    const client = db === pool ? await pool.connect() : db;
     const inserted = []
+    try {
+        if (db === pool) await client.query('BEGIN');
 
-    for (const match of matches) {
-        const isKnockout = isKnockoutMatch(match);
-        const isTwoLegged = tournament.is_two_legged_knockout && isKnockout && !match.auto_winner && !match.is_placeholder;
+        for (const match of matches) {
+            const isKnockout = isKnockoutMatch(match);
+            const isTwoLegged = tournament.is_two_legged_knockout && isKnockout && !match.auto_winner && !match.is_placeholder;
 
-        const createMatch = async (hId, aId, leg) => {
-            const status = match.auto_winner ? 'completed' : 'scheduled'
-            return db.query(
-                `INSERT INTO matches (
+            const createMatch = async (hId, aId, leg) => {
+                const status = match.auto_winner ? 'completed' : 'scheduled'
+                return client.query(
+                    `INSERT INTO matches (
                     tournament_id, home_team_id, away_team_id, round_number,
                     status, match_type, match_number, is_placeholder, group_name, leg
                 ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
-                [
-                    tournament.id, hId ?? null, aId ?? null, match.round_number,
-                    status, match.match_type || 'group', match.match_number ?? null,
-                    match.is_placeholder || false, match.group_name || null, leg
-                ]
-            )
-        }
+                    [
+                        tournament.id, hId ?? null, aId ?? null, match.round_number,
+                        status, match.match_type || 'group', match.match_number ?? null,
+                        match.is_placeholder || false, match.group_name || null, leg
+                    ]
+                )
+            }
 
-        const res1 = await createMatch(match.home_team_id, match.away_team_id, isKnockout && tournament.is_two_legged_knockout ? 1 : null)
-        let insertedMatch = res1.rows[0]
-        inserted.push(insertedMatch)
+            const res1 = await createMatch(match.home_team_id, match.away_team_id, isKnockout && tournament.is_two_legged_knockout ? 1 : null)
+            let insertedMatch = res1.rows[0]
 
-        if (isTwoLegged) {
-            const res2 = await createMatch(match.away_team_id, match.home_team_id, 2)
-            inserted.push(res2.rows[0])
-        }
-
-        if (match.auto_winner) {
-            const [homeScore, awayScore] = getByeScores(match, match.auto_winner)
-            const byeUpdate = await db.query(
-                `UPDATE matches
+            if (match.auto_winner) {
+                const [homeScore, awayScore] = getByeScores(match, match.auto_winner)
+                const byeUpdate = await client.query(
+                    `UPDATE matches
                  SET winner_team_id=$1,
                      home_score=$2,
                      away_score=$3
                  WHERE id=$4
                  RETURNING *`,
-                [match.auto_winner, homeScore, awayScore, insertedMatch.id]
-            )
-            insertedMatch = byeUpdate.rows[0]
-        }
-
-        inserted.push(insertedMatch)
-    }
-
-    const format = normalizeFormat(tournament.format)
-    const autoResolved = inserted.filter(match => match.status === 'completed' && match.winner_team_id)
-
-    for (const match of autoResolved) {
-        const loserTeamId = getLoserTeamId(match, match.winner_team_id)
-
-        if (format === 'single_elim' || (format === 'group_knockout' && match.match_type === 'knockout')) {
-            const hasNext = await advanceSingleEliminationWinner(tournament.id, match, match.winner_team_id, db)
-            if (!hasNext && format !== 'group_knockout') {
-                await markTournamentCompleted(tournament.id)
+                    [match.auto_winner, homeScore, awayScore, insertedMatch.id]
+                )
+                insertedMatch = byeUpdate.rows[0]
             }
-        } else if (format === 'double_elim') {
-            await processDoubleEliminationResult(tournament.id, match, match.winner_team_id, loserTeamId)
-        }
-    }
 
-    return inserted
+            inserted.push(insertedMatch)
+
+            if (isTwoLegged) {
+                const res2 = await createMatch(match.away_team_id, match.home_team_id, 2)
+                inserted.push(res2.rows[0])
+            }
+        }
+
+        const format = normalizeFormat(tournament.format)
+        const autoResolved = inserted.filter(match => match.status === 'completed' && match.winner_team_id)
+
+        for (const match of autoResolved) {
+            const loserTeamId = getLoserTeamId(match, match.winner_team_id)
+
+            if (format === 'single_elim' || (format === 'group_knockout' && match.match_type === 'knockout')) {
+                const hasNext = await advanceSingleEliminationWinner(tournament.id, match, match.winner_team_id, client)
+                if (!hasNext && format !== 'group_knockout') {
+                    await markTournamentCompleted(tournament.id)
+                }
+            } else if (format === 'double_elim') {
+                await processDoubleEliminationResult(tournament.id, match, match.winner_team_id, loserTeamId, client)
+            }
+        }
+
+        if (db === pool) await client.query('COMMIT');
+        return inserted
+    } catch (err) {
+        if (db === pool) await client.query('ROLLBACK');
+        throw err;
+    } finally {
+        if (db === pool) client.release();
+    }
 }
 
 async function getSwissPairingStandings(tournamentId) {
@@ -662,7 +717,8 @@ app.post('/api/tournaments', { preHandler: authenticate }, async request => {
         end_date,
         group_count,
         teams_advance_per_group,
-        is_double_round_robin
+        is_double_round_robin,
+        is_two_legged_knockout
     } = request.body
 
     const res = await pool.query(
@@ -679,8 +735,9 @@ app.post('/api/tournaments', { preHandler: authenticate }, async request => {
             end_date,
             group_count,
             teams_advance_per_group,
-            is_double_round_robin
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
+            is_double_round_robin,
+            is_two_legged_knockout
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,
         [
             request.user.id,
             name,
@@ -690,11 +747,10 @@ app.post('/api/tournaments', { preHandler: authenticate }, async request => {
             'registration',
             max_teams,
             description || null,
-            start_date || null,
-            end_date || null,
-            group_count || 2,
-            teams_advance_per_group || 2,
-            is_double_round_robin || false
+            request.body.group_count || 2,
+            request.body.teams_advance_per_group || 2,
+            request.body.is_double_round_robin || false,
+            request.body.is_two_legged_knockout || false
         ]
     )
 
@@ -964,18 +1020,10 @@ app.get('/api/tournaments/:id/fixtures', async request => {
     return { fixtures: result.rows }
 })
 
-app.patch('/api/tournaments/:id/matches/:matchId/score', { preHandler: authenticate }, async (request, reply) => {
-    const { home_score, away_score } = request.body
+app.patch('/api/tournaments/:id/matches/:matchId/score', { preHandler: authenticate, schema: scoreSchema }, async (request, reply) => {
+    const { home_score, away_score, home_penalty_score, away_penalty_score } = request.body
     const tournamentId = parseInt(request.params.id, 10)
     const matchId = parseInt(request.params.matchId, 10)
-
-    if (
-        home_score === undefined || away_score === undefined ||
-        isNaN(home_score) || isNaN(away_score) ||
-        parseInt(home_score, 10) < 0 || parseInt(away_score, 10) < 0
-    ) {
-        return reply.status(400).send({ error: 'Both scores must be valid non-negative numbers' })
-    }
 
     const tournament = await getTournamentForOwner(tournamentId, request.user.id)
     if (!tournament) return reply.status(403).send({ error: 'Not authorized' })
@@ -997,10 +1045,15 @@ app.patch('/api/tournaments/:id/matches/:matchId/score', { preHandler: authentic
         const format = normalizeFormat(tournament.format)
         const knockoutDraw =
             isDraw(home_score, away_score) &&
-            (format === 'single_elim' || format === 'double_elim' || (format === 'group_knockout' && isKnockoutMatch(match)))
+            (format === 'single_elim' || format === 'double_elim' || (format === 'group_knockout' && isKnockoutMatch(match))) &&
+            !tournament.is_two_legged_knockout;
 
-        if (knockoutDraw) {
+        // If it's a knockout draw and no penalties were provided, reject it
+        if (knockoutDraw && (home_penalty_score === undefined || away_penalty_score === undefined)) {
             return reply.status(400).send({ error: 'Knockout matches cannot end in a draw' })
+        }
+        if (knockoutDraw && home_penalty_score === away_penalty_score) {
+            return reply.status(400).send({ error: 'Penalty shootout must have a winner' })
         }
 
         let winnerTeamId = null;
@@ -1027,13 +1080,21 @@ app.patch('/api/tournaments/:id/matches/:matchId/score', { preHandler: authentic
 
                 if (totalTeamA > totalTeamB) winnerTeamId = m1.hId;
                 else if (totalTeamB > totalTeamA) winnerTeamId = m1.aId;
-                else isFinalResult = false; // It's a draw after aggregate!
+                else if (home_penalty_score !== undefined && away_penalty_score !== undefined) {
+                    // Aggregate draw, decided by penalties in the 2nd leg
+                    winnerTeamId = parseInt(home_penalty_score) > parseInt(away_penalty_score) ? match.home_team_id : match.away_team_id;
+                } else {
+                    isFinalResult = false; // It's a draw after aggregate, needs penalties or away goals logic
+                }
             } else {
                 isFinalResult = false; // Waiting for the other leg
             }
         } else {
             if (parseInt(home_score, 10) > parseInt(away_score, 10)) winnerTeamId = match.home_team_id;
             else if (parseInt(away_score, 10) > parseInt(home_score, 10)) winnerTeamId = match.away_team_id;
+            else if (knockoutDraw) {
+                winnerTeamId = parseInt(home_penalty_score) > parseInt(away_penalty_score) ? match.home_team_id : match.away_team_id;
+            }
         }
 
         await client.query('BEGIN')
@@ -1041,12 +1102,14 @@ app.patch('/api/tournaments/:id/matches/:matchId/score', { preHandler: authentic
             `UPDATE matches
          SET home_score=$1,
              away_score=$2,
+             home_penalty_score=$3,
+             away_penalty_score=$4,
              status='completed',
-             winner_team_id=$3,
+             winner_team_id=$5,
              played_at=NOW()
-         WHERE id=$4
+         WHERE id=$6
          RETURNING *`,
-            [parseInt(home_score, 10), parseInt(away_score, 10), winnerTeamId, matchId]
+            [parseInt(home_score), parseInt(away_score), home_penalty_score || null, away_penalty_score || null, winnerTeamId, matchId]
         )
 
         const updatedMatch = updatedResult.rows[0]
@@ -1086,6 +1149,83 @@ app.patch('/api/tournaments/:id/matches/:matchId/score', { preHandler: authentic
     }
 })
 
+app.patch('/api/tournaments/:id/matches/:matchId/reset', { preHandler: authenticate }, async (request, reply) => {
+    const tournamentId = parseInt(request.params.id, 10)
+    const matchId = parseInt(request.params.matchId, 10)
+
+    const tournament = await getTournamentForOwner(tournamentId, request.user.id)
+    if (!tournament) return reply.status(403).send({ error: 'Not authorized' })
+
+    const client = await pool.connect()
+    try {
+        const matchResult = await client.query(
+            'SELECT * FROM matches WHERE id=$1 AND tournament_id=$2',
+            [matchId, tournamentId]
+        )
+        if (matchResult.rows.length === 0) return reply.status(404).send({ error: 'Match not found' })
+
+        const match = matchResult.rows[0]
+        const winnerTeamId = match.winner_team_id
+        const format = normalizeFormat(tournament.format)
+
+        await client.query('BEGIN')
+
+        // 1. Reset the current match
+        await client.query(
+            `UPDATE matches 
+             SET home_score = NULL, 
+                 away_score = NULL, 
+                 status = 'scheduled', 
+                 winner_team_id = NULL, 
+                 played_at = NULL 
+             WHERE id = $1`,
+            [matchId]
+        )
+
+        // 2. If it was a knockout/elimination match, we need to clear the winner from the next round
+        if (winnerTeamId && (format === 'single_elim' || format === 'double_elim' || (format === 'group_knockout' && isKnockoutMatch(match)))) {
+            const nextRound = match.round_number + 1
+            const nextMatches = await getMatchesByTypeAndRound(tournamentId, match.match_type, nextRound)
+
+            if (nextMatches.length > 0) {
+                const currentRoundCount = await getRoundMatchCount(tournamentId, match.match_type, match.round_number)
+
+                const targetMatchNumber = nextMatches.length === currentRoundCount
+                    ? match.match_number
+                    : Math.ceil(match.match_number / 2)
+
+                const targetMatch = nextMatches.find(m => m.match_number === targetMatchNumber)
+
+                if (targetMatch && targetMatch.status === 'scheduled') {
+                    // Clear the specific slot that matches our winner
+                    if (targetMatch.home_team_id === winnerTeamId) {
+                        await client.query('UPDATE matches SET home_team_id = NULL, is_placeholder = true WHERE id = $1', [targetMatch.id])
+                    } else if (targetMatch.away_team_id === winnerTeamId) {
+                        await client.query('UPDATE matches SET away_team_id = NULL, is_placeholder = true WHERE id = $1', [targetMatch.id])
+                    }
+                }
+            }
+
+            // If we are resetting the grand final of a double elimination, 
+            // we might also need to clear the grand_final_reset match
+            if (match.match_type === 'grand_final') {
+                await client.query(
+                    "DELETE FROM matches WHERE tournament_id=$1 AND match_type='grand_final_reset'",
+                    [tournamentId]
+                )
+            }
+        }
+
+        await client.query('COMMIT')
+        return { message: 'Match score reset successfully' }
+    } catch (err) {
+        await client.query('ROLLBACK')
+        throw err
+    } finally {
+        client.release()
+    }
+})
+
 app.get('/api/tournaments/:id/standings', async request => {
     const tournamentId = parseInt(request.params.id, 10)
     const standings = await getStandingsRows(tournamentId)
@@ -1114,7 +1254,36 @@ app.post('/api/tournaments/:id/messages', async (request, reply) => {
         [tournamentId, sender_name.trim(), content.trim()]
     )
 
-    return { message: result.rows[0] }
+    const newMessage = result.rows[0]
+
+    // Broadcast to connected WebSocket clients for this tournament
+    const clients = chatClients.get(tournamentId)
+    if (clients) {
+        const payload = JSON.stringify({ type: 'new_message', message: newMessage })
+        clients.forEach(client => {
+            if (client.readyState === 1) client.send(payload)
+        })
+    }
+
+    return { message: newMessage }
+})
+
+// WebSocket endpoint for real-time chat
+app.get('/api/tournaments/:id/chat', { websocket: true }, (connection, req) => {
+    const tournamentId = parseInt(req.params.id, 10)
+    
+    if (!chatClients.has(tournamentId)) {
+        chatClients.set(tournamentId, new Set())
+    }
+    chatClients.get(tournamentId).add(connection.socket)
+
+    connection.socket.on('close', () => {
+        const clients = chatClients.get(tournamentId)
+        if (clients) {
+            clients.delete(connection.socket)
+            if (clients.size === 0) chatClients.delete(tournamentId)
+        }
+    })
 })
 
 app.get('/api/tournaments/:id/groups', async request => {

@@ -9,6 +9,7 @@ function MatchCard({ match, isFinal }) {
     const awayWon = match.winner_team_id === match.away_team_id
     const isDone = match.status === 'completed'
     const isTBD = !match.home_team_name && !match.away_team_name
+    const hasPenalties = match.home_penalty_score !== null || match.away_penalty_score !== null
 
     return (
         <div className={`w-52 rounded-xl overflow-hidden border shadow-sm ${isFinal ? 'border-brand-200' : 'border-gray-200'}`}>
@@ -18,9 +19,12 @@ function MatchCard({ match, isFinal }) {
                 </span>
                 <div className="flex items-center gap-1 ml-2">
                     {isDone && (
-                        <span className={`text-sm font-bold w-5 text-right ${homeWon ? 'text-brand-600' : 'text-gray-400'}`}>
-                            {match.home_score}
-                        </span>
+                        <div className="flex flex-col items-end">
+                            <span className={`text-sm font-bold ${homeWon ? 'text-brand-600' : 'text-gray-400'}`}>
+                                {match.home_score}
+                            </span>
+                            {hasPenalties && <span className="text-[10px] text-gray-400">P: {match.home_penalty_score}</span>}
+                        </div>
                     )}
                     {homeWon && <span className="text-brand-500 text-xs">✓</span>}
                 </div>
@@ -32,9 +36,12 @@ function MatchCard({ match, isFinal }) {
                 </span>
                 <div className="flex items-center gap-1 ml-2">
                     {isDone && (
-                        <span className={`text-sm font-bold w-5 text-right ${awayWon ? 'text-brand-600' : 'text-gray-400'}`}>
-                            {match.away_score}
-                        </span>
+                        <div className="flex flex-col items-end">
+                            <span className={`text-sm font-bold ${awayWon ? 'text-brand-600' : 'text-gray-400'}`}>
+                                {match.away_score}
+                            </span>
+                            {hasPenalties && <span className="text-[10px] text-gray-400">P: {match.away_penalty_score}</span>}
+                        </div>
                     )}
                     {awayWon && <span className="text-brand-500 text-xs">✓</span>}
                 </div>
@@ -223,12 +230,22 @@ export default function ManageTournament() {
         try {
             await api.patch(`/api/tournaments/${id}/matches/${matchId}/score`, {
                 home_score: parseInt(s.home),
-                away_score: parseInt(s.away)
+                away_score: parseInt(s.away),
+                home_penalty_score: s.pHome ? parseInt(s.pHome) : undefined,
+                away_penalty_score: s.pAway ? parseInt(s.pAway) : undefined
             })
             await loadData()
             setScores(prev => { const c = { ...prev }; delete c[matchId]; return c })
         } catch (err) { alert(err.response?.data?.error || 'Failed') }
         finally { setSubmitting(null) }
+    }
+
+    async function handleResetMatch(matchId) {
+        if (!confirm('Reset this match score? This will clear the result and might affect progression.')) return
+        try {
+            await api.patch(`/api/tournaments/${id}/matches/${matchId}/reset`)
+            await loadData()
+        } catch (err) { alert(err.response?.data?.error || 'Failed to reset') }
     }
 
     async function handleStatusChange(status) {
@@ -520,6 +537,14 @@ export default function ManageTournament() {
                                                             {match.away_team_name || 'TBD'}
                                                         </span>
                                                     </div>
+                                                    {match.status === 'completed' && (
+                                                        <button
+                                                            onClick={() => handleResetMatch(match.id)}
+                                                            className="mt-2 text-[10px] text-gray-400 hover:text-red-500 uppercase tracking-widest font-semibold transition-colors"
+                                                        >
+                                                            Reset Score
+                                                        </button>
+                                                    )}
                                                 </div>
                                             ))}
                                         </div>
@@ -564,6 +589,24 @@ export default function ManageTournament() {
                                             />
                                         </div>
                                     </div>
+
+                                    {scores[match.id]?.home === scores[match.id]?.away && scores[match.id]?.home !== '' && (
+                                        <div className="mt-4 p-3 bg-brand-50 rounded-lg border border-brand-100">
+                                            <p className="text-[10px] font-bold text-brand-600 uppercase mb-2">Penalty Shootout Required</p>
+                                            <div className="flex items-center gap-3">
+                                                <input type="number" placeholder="P"
+                                                    value={scores[match.id]?.pHome ?? ''}
+                                                    onChange={e => setScores(p => ({ ...p, [match.id]: { ...p[match.id], pHome: e.target.value } }))}
+                                                    className="input flex-1 text-center text-sm" />
+                                                <span className="text-brand-300">pk</span>
+                                                <input type="number" placeholder="P"
+                                                    value={scores[match.id]?.pAway ?? ''}
+                                                    onChange={e => setScores(p => ({ ...p, [match.id]: { ...p[match.id], pAway: e.target.value } }))}
+                                                    className="input flex-1 text-center text-sm" />
+                                            </div>
+                                        </div>
+                                    )}
+
                                     <button
                                         onClick={() => handleScore(match.id)}
                                         disabled={

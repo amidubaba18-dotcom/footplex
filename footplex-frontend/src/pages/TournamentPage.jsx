@@ -11,6 +11,7 @@ function MatchCard({ match, isFinal }) {
     const awayWon = match.winner_team_id === match.away_team_id
     const isDone = match.status === 'completed'
     const isTBD = !match.home_team_name && !match.away_team_name
+    const hasPenalties = match.home_penalty_score !== null || match.away_penalty_score !== null
 
     return (
         <div className={`w-52 rounded-xl overflow-hidden border shadow-sm ${isFinal ? 'border-brand-200' : 'border-gray-200'}`}>
@@ -20,9 +21,12 @@ function MatchCard({ match, isFinal }) {
                 </span>
                 <div className="flex items-center gap-1 ml-2">
                     {isDone && (
-                        <span className={`text-sm font-bold w-5 text-right ${homeWon ? 'text-brand-600' : 'text-gray-400'}`}>
-                            {match.home_score}
-                        </span>
+                        <div className="flex flex-col items-end">
+                            <span className={`text-sm font-bold ${homeWon ? 'text-brand-600' : 'text-gray-400'}`}>
+                                {match.home_score}
+                            </span>
+                            {hasPenalties && <span className="text-[10px] text-gray-400">({match.home_penalty_score})</span>}
+                        </div>
                     )}
                     {homeWon && <span className="text-brand-500 text-xs">✓</span>}
                 </div>
@@ -34,9 +38,12 @@ function MatchCard({ match, isFinal }) {
                 </span>
                 <div className="flex items-center gap-1 ml-2">
                     {isDone && (
-                        <span className={`text-sm font-bold w-5 text-right ${awayWon ? 'text-brand-600' : 'text-gray-400'}`}>
-                            {match.away_score}
-                        </span>
+                        <div className="flex flex-col items-end">
+                            <span className={`text-sm font-bold ${awayWon ? 'text-brand-600' : 'text-gray-400'}`}>
+                                {match.away_score}
+                            </span>
+                            {hasPenalties && <span className="text-[10px] text-gray-400">({match.away_penalty_score})</span>}
+                        </div>
                     )}
                     {awayWon && <span className="text-brand-500 text-xs">✓</span>}
                 </div>
