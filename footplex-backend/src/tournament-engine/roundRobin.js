@@ -1,4 +1,4 @@
-function generateRoundRobin(teams) {
+export function generateRoundRobin(teams) {
     const matches = []
 
     // Add BYE if odd number of teams
@@ -12,15 +12,17 @@ function generateRoundRobin(teams) {
     const matchesPerRound = totalTeams / 2
 
     for (let round = 0; round < totalRounds; round++) {
+        let matchNumber = 1
 
         for (let i = 0; i < matchesPerRound; i++) {
             const home = list[i]
             const away = list[totalTeams - 1 - i]
 
             // Skip BYE matches
-            if (home.id && away.id) {
+            if (home?.id != null && away?.id != null) {
                 matches.push({
                     round_number: round + 1,
+                    match_number: matchNumber++,
                     home_team_id: home.id,
                     away_team_id: away.id,
                     match_type: 'group'
@@ -39,3 +41,5 @@ function generateRoundRobin(teams) {
 
     return matches
 }
+
+export default generateRoundRobin

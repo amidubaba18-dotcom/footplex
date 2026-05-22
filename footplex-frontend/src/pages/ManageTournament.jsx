@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import api from '../lib/api'
+import SharedBracketView from '../Components/BracketView'
+import { getFixtureLabel, getManageTournamentTabs } from '../lib/tournamentFormat'
 
 function MatchCard({ match, isFinal }) {
     const homeWon = match.winner_team_id === match.home_team_id
@@ -117,7 +119,24 @@ function BracketView({ fixtures, tournament }) {
     )
 }
 
-const TABS = ['teams', 'fixtures', 'bracket', 'scores', 'settings']
+const BRACKET_FORMATS = new Set([
+    'single_elim',
+    'single_elimination',
+    'double_elim',
+    'double_elimination',
+    'group_knockout'
+])
+
+const getTabs = (format) => {
+    const tabs = ['teams', 'fixtures']
+
+    if (BRACKET_FORMATS.has(format)) {
+        tabs.push('bracket')
+    }
+
+    tabs.push('scores', 'settings')
+    return tabs
+}
 
 export default function ManageTournament() {
     const { id } = useParams()
@@ -152,6 +171,14 @@ export default function ManageTournament() {
             .then(res => setTournament(res.data.tournaments.find(t => t.id === parseInt(id))))
         loadData().finally(() => setLoading(false))
     }, [id])
+
+    useEffect(() => {
+        if (!tournament) return
+        const availableTabs = getManageTournamentTabs(tournament.format)
+        if (!availableTabs.includes(tab)) {
+            setTab(availableTabs[0])
+        }
+    }, [tournament, tab])
 
     async function handleAddTeam(e) {
         e.preventDefault()
@@ -313,7 +340,7 @@ export default function ManageTournament() {
             {/* Tabs */}
             <div className="bg-white border-b border-gray-200 overflow-x-auto">
                 <div className="flex px-6 min-w-max">
-                    {TABS.map(t => (
+                    {getManageTournamentTabs(tournament?.format).map(t => (
                         <button key={t} onClick={() => setTab(t)}
                             className={`py-3 px-4 text-sm font-medium capitalize border-b-2 transition-colors ${tab === t ? 'border-gray-900 text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-700'
                                 }`}>
@@ -340,7 +367,7 @@ export default function ManageTournament() {
                                 disabled={generating || confirmed.length < 2}
                                 className="btn-secondary text-sm disabled:opacity-40"
                             >
-                                {generating ? 'Generating...' : '⚡ Generate Fixtures'}
+                                {generating ? 'Generating...' : tournament?.format === 'swiss' && fixtures.length > 0 ? 'Generate Next Round' : '⚡ Generate Fixtures'}
                             </button>
                         </div>
 
@@ -435,7 +462,7 @@ export default function ManageTournament() {
                             <p className="text-sm text-gray-500">{completed.length}/{fixtures.length} matches completed</p>
                             <button onClick={handleGenerate} disabled={generating}
                                 className="btn-secondary text-xs py-1.5 px-3 disabled:opacity-40">
-                                {generating ? 'Regenerating...' : '↺ Regenerate'}
+                                {generating ? 'Generating...' : tournament?.format === 'swiss' ? 'Generate Next Round' : '↺ Regenerate'}
                             </button>
                         </div>
 
@@ -445,24 +472,30 @@ export default function ManageTournament() {
                             </div>
                         ) : (
                             (() => {
-                                const rounds = [...new Set(fixtures.map(f => f.round_number))].sort((a, b) => a - b)
-                                return rounds.map(round => {
-                                    const roundMatches = fixtures.filter(f => f.round_number === round)
-                                    const firstMatch = roundMatches[0]
-                                    const label = firstMatch?.round_label ||
-                                        (firstMatch?.match_type === 'final' ? 'Final' :
-                                            firstMatch?.match_type === 'semi_final' ? 'Semi-Finals' :
-                                                firstMatch?.match_type === 'quarter_final' ? 'Quarter-Finals' :
-                                                    firstMatch?.group_name ? `Group ${firstMatch.group_name}` :
-                                                        `Round ${round}`)
+                                const sections = []
+                                const byKey = new Map()
 
-                                    return (
-                                        <div key={round}>
+                                fixtures.forEach(match => {
+                                    const key = `${match.group_name || 'main'}-${match.match_type}-${match.round_number}`
+                                    if (!byKey.has(key)) {
+                                        const section = {
+                                            key,
+                                            label: getFixtureLabel(match),
+                                            matches: []
+                                        }
+                                        byKey.set(key, section)
+                                        sections.push(section)
+                                    }
+                                    byKey.get(key).matches.push(match)
+                                })
+
+                                return sections.map(section => (
+                                        <div key={section.key}>
                                             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
-                                                {label}
+                                                {section.label}
                                             </p>
                                             <div className="space-y-2">
-                                                {roundMatches.map(match => (
+                                                {section.matches.map(match => (
                                                     <div key={match.id} className="card">
                                                         <div className="flex items-center justify-between gap-3">
                                                             <span className={`font-medium text-sm flex-1 ${match.winner_team_id === match.home_team_id ? 'text-brand-500 font-bold' : 'text-gray-900'
@@ -485,22 +518,18 @@ export default function ManageTournament() {
                                                                 {match.away_team_name || 'TBD'}
                                                             </span>
                                                         </div>
-                                                        {match.group_name && (
-                                                            <p className="text-xs text-gray-400 mt-1">Group {match.group_name}</p>
-                                                        )}
                                                     </div>
                                                 ))}
                                             </div>
                                         </div>
-                                    )
-                                })
+                                    ))
                             })()
                         )}
                     </div>
                 )}
 
                 {tab === 'bracket' && (
-                    <BracketView fixtures={fixtures || []} tournament={tournament} />
+                    <SharedBracketView fixtures={fixtures || []} tournament={tournament} />
                 )}
 
                 {/* SCORES TAB */}
@@ -513,7 +542,7 @@ export default function ManageTournament() {
                         ) : (
                             scheduled.map(match => (
                                 <div key={match.id} className="card">
-                                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Round {match.round_number}</p>
+                                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">{getFixtureLabel(match)}</p>
                                     <div className="flex items-center gap-3">
                                         <div className="flex-1">
                                             <p className="text-sm font-medium text-gray-900 mb-1.5">{match.home_team_name}</p>

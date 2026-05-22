@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import api from '../lib/api'
+import SharedBracketView from '../Components/BracketView'
+import { getFixtureLabel, getPublicTournamentTabs } from '../lib/tournamentFormat'
 
 function MatchCard({ match, isFinal }) {
     const homeWon = match.winner_team_id === match.home_team_id
@@ -176,9 +178,36 @@ function BracketView({ fixtures, tournament }) {
     )
 }
 
-const getTabs = (format) => format === 'single_elimination'
-    ? ['fixtures', 'bracket', 'teams', 'chat', 'info']
-    : ['standings', 'fixtures', 'bracket', 'teams', 'chat', 'info']
+const BRACKET_FORMATS = new Set([
+    'single_elim',
+    'single_elimination',
+    'double_elim',
+    'double_elimination',
+    'group_knockout'
+])
+
+const STANDINGS_FORMATS = new Set([
+    'round_robin',
+    'swiss',
+    'group_knockout'
+])
+
+const getTabs = (format) => {
+    const tabs = []
+
+    if (STANDINGS_FORMATS.has(format)) {
+        tabs.push('standings')
+    }
+
+    tabs.push('fixtures')
+
+    if (BRACKET_FORMATS.has(format)) {
+        tabs.push('bracket')
+    }
+
+    tabs.push('teams', 'chat', 'info')
+    return tabs
+}
 
 export default function TournamentPage() {
     const { slug } = useParams()
@@ -248,8 +277,9 @@ export default function TournamentPage() {
 
     useEffect(() => {
         if (!tournament) return
-        if (tournament.format === 'single_elimination' && tab === 'standings') {
-            setTab('fixtures')
+        const availableTabs = getPublicTournamentTabs(tournament.format)
+        if (!availableTabs.includes(tab)) {
+            setTab(availableTabs[0])
         }
     }, [tournament, tab])
 
@@ -287,7 +317,6 @@ export default function TournamentPage() {
             alert('✅ Request submitted! Organizer will review shortly.')
             setRequestForm({ name: '', contact_name: '', contact_email: '' })
             setShowRequestForm(false)
-            await loadData()
         } catch (err) {
             alert(err.response?.data?.error || 'Request failed')
         } finally {
@@ -404,7 +433,7 @@ export default function TournamentPage() {
             {/* Tabs */}
             <div className="bg-white border-b border-gray-200 overflow-x-auto">
                 <div className="flex px-6 min-w-max">
-                    {getTabs(tournament?.format).map(t => (
+                    {getPublicTournamentTabs(tournament?.format).map(t => (
                         <button key={t} onClick={() => setTab(t)}
                             className={`py-3 px-4 text-sm font-medium capitalize border-b-2 transition-colors ${tab === t ? 'border-gray-900 text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-700'
                                 }`}>
@@ -571,7 +600,7 @@ export default function TournamentPage() {
                             <div className="space-y-4">
                                 {[...new Set(fixtures.map(f => f.round_number))].sort((a, b) => a - b).map(round => (
                                     <div key={round}>
-                                        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Round {round}</p>
+                                        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">{getFixtureLabel(fixtures.find(f => f.round_number === round))}</p>
                                         <div className="space-y-2">
                                             {fixtures.filter(f => f.round_number === round).map(match => (
                                                 <div key={match.id} className="card flex items-center justify-between gap-3">
@@ -595,7 +624,7 @@ export default function TournamentPage() {
                 )}
 
                 {tab === 'bracket' && (
-                    <BracketView fixtures={fixtures} tournament={tournament} />
+                    <SharedBracketView fixtures={fixtures} tournament={tournament} />
                 )}
 
                 {/* TEAMS */}
