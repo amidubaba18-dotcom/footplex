@@ -128,53 +128,7 @@ function BracketView({ fixtures, tournament }) {
                                     minHeight: `${Math.max(roundMatches.length, 1) * 90}px`
                                 }}>
                                     {roundMatches.map(match => {
-                                        const homeWon = match.winner_team_id === match.home_team_id
-                                        const awayWon = match.winner_team_id === match.away_team_id
-                                        const isDone = match.status === 'completed'
-                                        const isTBD = !match.home_team_name && !match.away_team_name
-
-                                        return (
-                                            <div key={match.id} className={`w-52 rounded-xl overflow-hidden border shadow-sm ${isFinal ? 'border-yellow-200' : 'border-gray-200'
-                                                }`}>
-                                                <div className={`flex items-center justify-between px-3 py-2.5 border-b ${homeWon ? 'bg-brand-50 border-brand-100' : 'border-gray-100'
-                                                    }`}>
-                                                    <span className={`text-sm truncate flex-1 ${isTBD ? 'text-gray-300 italic' :
-                                                        homeWon ? 'font-bold text-brand-600' :
-                                                            isDone ? 'text-gray-400' : 'font-medium text-gray-900'
-                                                        }`}>
-                                                        {match.home_team_name || 'TBD'}
-                                                    </span>
-                                                    <div className="flex items-center gap-1 ml-2">
-                                                        {isDone && (
-                                                            <span className={`text-sm font-bold w-5 text-right ${homeWon ? 'text-brand-600' : 'text-gray-400'
-                                                                }`}>
-                                                                {match.home_score}
-                                                            </span>
-                                                        )}
-                                                        {homeWon && <span className="text-brand-500 text-xs">✓</span>}
-                                                    </div>
-                                                </div>
-
-                                                <div className={`flex items-center justify-between px-3 py-2.5 ${awayWon ? 'bg-brand-50' : 'bg-white'
-                                                    }`}>
-                                                    <span className={`text-sm truncate flex-1 ${isTBD ? 'text-gray-300 italic' :
-                                                        awayWon ? 'font-bold text-brand-600' :
-                                                            isDone ? 'text-gray-400' : 'font-medium text-gray-900'
-                                                        }`}>
-                                                        {match.away_team_name || 'TBD'}
-                                                    </span>
-                                                    <div className="flex items-center gap-1 ml-2">
-                                                        {isDone && (
-                                                            <span className={`text-sm font-bold w-5 text-right ${awayWon ? 'text-brand-600' : 'text-gray-400'
-                                                                }`}>
-                                                                {match.away_score}
-                                                            </span>
-                                                        )}
-                                                        {awayWon && <span className="text-brand-500 text-xs">✓</span>}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        )
+                                        return <MatchCard key={match.id} match={match} isFinal={isFinal} />
                                     })}
                                 </div>
                             </div>

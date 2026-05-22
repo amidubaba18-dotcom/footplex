@@ -1,5 +1,6 @@
-import pool from '../plugins/db.js';
-import { getSwissRounds } from '../tournament-engine/swiss.js';
+import pool from './plugins/db.js'; // Corrected path for clarity and consistency
+import { getSwissRounds } from './tournament-engine/swiss.js';
+import { MatchService } from './MatchService.js'; // Import MatchService to pass to getGroupsData's standings
 
 export const TournamentService = {
     async getForOwner(tournamentId, userId) {
@@ -57,7 +58,8 @@ export const TournamentService = {
         const groups = [];
         for (const row of groupsResult.rows) {
             const groupName = row.group_name;
-            // getStandingsRows and fixtures logic moved here or kept as shared helpers
+            // When getting group data, we also want group standings
+            const standings = await this.getStandings(tournamentId, groupName, db);
             const fixturesResult = await db.query(
                 `SELECT m.*, ht.name AS home_team_name, at.name AS away_team_name
                  FROM matches m
@@ -70,8 +72,8 @@ export const TournamentService = {
 
             groups.push({
                 name: groupName,
+                standings: standings, // Include standings here
                 fixtures: fixturesResult.rows
-                // standings calculation would follow
             });
         }
         return groups;

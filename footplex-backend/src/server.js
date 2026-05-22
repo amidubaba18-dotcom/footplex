@@ -4,6 +4,8 @@ import jwt from '@fastify/jwt'
 import bcrypt from 'bcrypt'
 import pool from './plugins/db.js'
 import websocket from '@fastify/websocket'
+import multipart from '@fastify/multipart'
+import { v2 as cloudinary } from 'cloudinary'
 import { MatchService } from './MatchService.js'
 import { TournamentService } from './TournamentService.js'
 
@@ -62,6 +64,14 @@ const KNOCKOUT_MATCH_TYPES = new Set([
 
 await app.register(cors, { origin: '*', credentials: true, methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'] })
 await app.register(jwt, { secret: process.env.JWT_SECRET })
+await app.register(multipart, {
+    limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit for files
+})
+cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET
+});
 await app.register(websocket)
 
 const authenticate = async (request, reply) => {
@@ -99,183 +109,6 @@ function isKnockoutMatch(match) {
 
 function isDraw(homeScore, awayScore) {
     return parseInt(homeScore, 10) === parseInt(awayScore, 10)
-}
-
-async function advanceWinnersBracketWinner(tournamentId, match, winnerTeamId) {
-    const nextRoundMatches = await MatchService.getByTypeAndRound(tournamentId, 'winners', match.round_number + 1)
-
-    if (nextRoundMatches.length === 0) {
-        const grandFinal = await pool.query(
-            `SELECT * FROM matches
-             WHERE tournament_id=$1
-               AND match_type='grand_final'
-             ORDER BY id
-             LIMIT 1`,
-            [tournamentId]
-        )
-
-        await MatchService.fillSlot(grandFinal.rows[0].id, winnerTeamId, 'home')
-        return
-    }
-
-    const targetMatchNumber = Math.ceil(match.match_number / 2)
-    const targetMatch = nextRoundMatches.find(nextMatch => nextMatch.match_number === targetMatchNumber)
-    const preferredSlot = match.match_number % 2 === 1 ? 'home' : 'away'
-
-    await MatchService.fillSlot(targetMatch.id, winnerTeamId, preferredSlot)
-}
-
-async function dropWinnersBracketLoser(tournamentId, match, loserTeamId) {
-    if (loserTeamId == null) return
-
-    const winnersRoundResult = await pool.query(
-        `SELECT COALESCE(MAX(round_number), 1) AS max_round
-         FROM matches
-         WHERE tournament_id=$1
-           AND match_type='winners'`,
-        [tournamentId]
-    )
-    const winnersRoundCount = parseInt(winnersRoundResult.rows[0].max_round, 10)
-
-    if (winnersRoundCount === 1) {
-        const grandFinal = await pool.query(
-            `SELECT * FROM matches
-             WHERE tournament_id=$1
-               AND match_type='grand_final'
-             ORDER BY id
-             LIMIT 1`,
-            [tournamentId]
-        )
-        await MatchService.fillSlot(grandFinal.rows[0].id, loserTeamId, 'away')
-        return
-    }
-
-    let targetRound = null
-    let targetMatchNumber = null
-    let preferredSlot = null
-
-    if (match.round_number === 1) {
-        targetRound = 1
-        targetMatchNumber = Math.ceil(match.match_number / 2)
-        preferredSlot = match.match_number % 2 === 1 ? 'home' : 'away'
-    } else if (match.round_number < winnersRoundCount) {
-        targetRound = (match.round_number * 2) - 2
-        targetMatchNumber = match.match_number
-        preferredSlot = 'away'
-    } else {
-        targetRound = (winnersRoundCount * 2) - 2
-        targetMatchNumber = 1
-        preferredSlot = 'away'
-    }
-
-    const targetMatches = await MatchService.getByTypeAndRound(tournamentId, 'losers', targetRound)
-    const targetMatch = targetMatches.find(nextMatch => nextMatch.match_number === targetMatchNumber)
-    await MatchService.fillSlot(targetMatch.id, loserTeamId, preferredSlot)
-}
-
-async function advanceLosersBracketWinner(tournamentId, match, winnerTeamId) {
-    const losersRoundResult = await pool.query(
-        `SELECT COALESCE(MAX(round_number), 0) AS max_round
-         FROM matches
-         WHERE tournament_id=$1
-           AND match_type='losers'`,
-        [tournamentId]
-    )
-    const losersRoundCount = parseInt(losersRoundResult.rows[0].max_round, 10)
-
-    if (losersRoundCount === 0 || match.round_number === losersRoundCount) {
-        const grandFinal = await pool.query(
-            `SELECT * FROM matches
-             WHERE tournament_id=$1
-               AND match_type='grand_final'
-             ORDER BY id
-             LIMIT 1`,
-            [tournamentId]
-        )
-        await MatchService.fillSlot(grandFinal.rows[0].id, winnerTeamId, 'away')
-        return
-    }
-
-    const nextRound = match.round_number + 1
-    const targetMatchNumber =
-        match.round_number % 2 === 1
-            ? match.match_number
-            : Math.ceil(match.match_number / 2)
-    const preferredSlot =
-        match.round_number % 2 === 1
-            ? 'home'
-            : match.match_number % 2 === 1
-                ? 'home'
-                : 'away'
-
-    const targetMatches = await MatchService.getByTypeAndRound(tournamentId, 'losers', nextRound)
-    const targetMatch = targetMatches.find(nextMatch => nextMatch.match_number === targetMatchNumber)
-    await MatchService.fillSlot(targetMatch.id, winnerTeamId, preferredSlot)
-}
-
-async function ensureGrandFinalReset(tournamentId, homeTeamId, awayTeamId) {
-    const existing = await pool.query(
-        `SELECT *
-         FROM matches
-         WHERE tournament_id=$1
-           AND match_type='grand_final_reset'
-         ORDER BY id
-         LIMIT 1`,
-        [tournamentId]
-    )
-
-    if (existing.rows.length > 0) {
-        await pool.query(
-            `UPDATE matches
-             SET home_team_id=$1,
-                 away_team_id=$2,
-                 is_placeholder=false
-             WHERE id=$3`,
-            [homeTeamId, awayTeamId, existing.rows[0].id]
-        )
-        return
-    }
-
-    await pool.query(
-        `INSERT INTO matches (
-            tournament_id,
-            home_team_id,
-            away_team_id,
-            round_number,
-            status,
-            match_type,
-            match_number,
-            is_placeholder
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-        [tournamentId, homeTeamId, awayTeamId, 2, 'scheduled', 'grand_final_reset', 1, false]
-    )
-}
-
-async function processDoubleEliminationResult(tournamentId, match, winnerTeamId, loserTeamId) {
-    if (match.match_type === 'winners') {
-        await advanceWinnersBracketWinner(tournamentId, match, winnerTeamId)
-        await dropWinnersBracketLoser(tournamentId, match, loserTeamId)
-        return
-    }
-
-    if (match.match_type === 'losers') {
-        await advanceLosersBracketWinner(tournamentId, match, winnerTeamId)
-        return
-    }
-
-    if (match.match_type === 'grand_final') {
-        if (winnerTeamId === match.home_team_id) {
-            await TournamentService.markCompleted(tournamentId)
-            return
-        }
-
-        await ensureGrandFinalReset(tournamentId, match.home_team_id, match.away_team_id)
-        return
-    }
-
-    if (match.match_type === 'grand_final_reset') {
-        await TournamentService.markCompleted(tournamentId)
-    }
 }
 
 async function maybeCreateGroupKnockoutStage(tournament, db = pool) {
@@ -398,11 +231,12 @@ async function insertMatches(tournament, matches, db = pool) {
                 insertedMatch = byeUpdate.rows[0]
             }
 
-            inserted.push(insertedMatch)
-
             if (isTwoLegged) {
+                inserted.push(insertedMatch)
                 const res2 = await createMatch(match.away_team_id, match.home_team_id, 2)
                 inserted.push(res2.rows[0])
+            } else {
+                inserted.push(insertedMatch)
             }
         }
 
@@ -418,7 +252,7 @@ async function insertMatches(tournament, matches, db = pool) {
                     await TournamentService.markCompleted(tournament.id)
                 }
             } else if (format === 'double_elim') {
-                await processDoubleEliminationResult(tournament.id, match, match.winner_team_id, loserTeamId, client)
+                await MatchService.processDoubleEliminationResult(tournament.id, match, match.winner_team_id, loserTeamId, client)
             }
         }
 
@@ -900,7 +734,7 @@ app.patch('/api/tournaments/:id/matches/:matchId/score', { preHandler: authentic
         }
 
         if (format === 'double_elim' && winnerTeamId != null) {
-            await processDoubleEliminationResult(tournamentId, updatedMatch, winnerTeamId, loserTeamId)
+            await MatchService.processDoubleEliminationResult(tournamentId, updatedMatch, winnerTeamId, loserTeamId, client)
         }
 
         if (format === 'group_knockout') {
@@ -951,9 +785,8 @@ app.patch('/api/tournaments/:id/matches/:matchId/reset', { preHandler: authentic
         await MatchService.resetMatch(matchId, tournamentId, client);
 
         // 2. If it was a knockout/elimination match, we need to clear the winner from the next round
-        if (winnerTeamId && (format === 'single_elim' || format === 'double_elim' || (format === 'group_knockout' && isKnockoutMatch(match)))) {
-            // Logic to clear subsequent round slots would go here, 
-            // calling MatchService for consistency.
+        if (winnerTeamId && (format === 'single_elim' || (format === 'group_knockout' && isKnockoutMatch(match)))) {
+            await MatchService.rollbackAdvancement(tournamentId, match, winnerTeamId, client);
         }
 
         await client.query('COMMIT')
@@ -965,6 +798,51 @@ app.patch('/api/tournaments/:id/matches/:matchId/reset', { preHandler: authentic
         client.release()
     }
 })
+
+app.post('/api/tournaments/:tournamentId/teams/:teamId/logo', { preHandler: authenticate }, async (request, reply) => {
+    const tournamentId = parseInt(request.params.tournamentId, 10);
+    const teamId = parseInt(request.params.teamId, 10);
+
+    // Ensure organizer owns the tournament
+    const tournament = await TournamentService.getForOwner(tournamentId, request.user.id);
+    if (!tournament) {
+        return reply.status(403).send({ error: 'Not authorized or tournament not found.' });
+    }
+
+    // Ensure team belongs to the tournament
+    const teamResult = await pool.query(
+        'SELECT id, name, logo_url FROM teams WHERE id=$1 AND tournament_id=$2',
+        [teamId, tournamentId]
+    );
+    if (teamResult.rows.length === 0) {
+        return reply.status(404).send({ error: 'Team not found in this tournament.' });
+    }
+
+    const data = await request.file();
+    if (!data || !data.file) {
+        return reply.status(400).send({ error: 'No file uploaded.' });
+    }
+
+    if (!data.mimetype.startsWith('image/')) {
+        return reply.status(400).send({ error: 'Only image files are allowed.' });
+    }
+
+    try {
+        const buffer = await data.toBuffer();
+        const uploadResult = await new Promise((resolve, reject) => {
+            cloudinary.uploader.upload_stream({ folder: `footplex/teams/${tournamentId}` }, (error, result) => {
+                if (error) reject(error);
+                resolve(result);
+            }).end(buffer);
+        });
+
+        const updatedTeam = await pool.query('UPDATE teams SET logo_url=$1 WHERE id=$2 RETURNING *', [uploadResult.secure_url, teamId]);
+        return { message: 'Logo uploaded successfully', team: updatedTeam.rows[0] };
+    } catch (error) {
+        console.error('Cloudinary upload error:', error);
+        return reply.status(500).send({ error: 'Failed to upload logo.' });
+    }
+});
 
 app.get('/api/tournaments/:id/standings', async request => {
     const tournamentId = parseInt(request.params.id, 10)
