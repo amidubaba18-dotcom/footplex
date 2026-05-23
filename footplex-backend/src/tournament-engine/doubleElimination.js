@@ -1,84 +1,136 @@
 import { seedBracketSlots } from './singleElimination.js'
 
-export function getLosersRoundCounts(bracketSize) {
-    const winnersRounds = Math.log2(bracketSize)
+function isPowerOfTwo(num) {
+    return (num & (num - 1)) === 0
+}
 
-    if (winnersRounds <= 1) {
+export function getLosersRoundCounts(bracketSize) {
+    if (!isPowerOfTwo(bracketSize) || bracketSize < 4) {
         return []
     }
 
-    const counts = [bracketSize / 4]
+    const winnersRounds = Math.log2(bracketSize)
+    const rounds = []
 
+    // First losers round
+    rounds.push(bracketSize / 4)
+
+    // Middle losers rounds
     for (let winnersRound = 2; winnersRound < winnersRounds; winnersRound++) {
-        counts.push(bracketSize / (2 ** winnersRound))
-        counts.push(bracketSize / (2 ** (winnersRound + 1)))
+        rounds.push(bracketSize / (2 ** winnersRound))
+        rounds.push(bracketSize / (2 ** (winnersRound + 1)))
     }
 
-    counts.push(1)
-    return counts
+    // Losers final
+    rounds.push(1)
+
+    return rounds
+}
+
+function createMatch({
+    round,
+    matchNumber,
+    type,
+    home = null,
+    away = null,
+    placeholder = true,
+    autoWinner = null
+}) {
+    return {
+        round_number: round,
+        match_number: matchNumber,
+        match_type: type,
+
+        home_team_id: home?.id ?? null,
+        away_team_id: away?.id ?? null,
+
+        is_placeholder: placeholder,
+        auto_winner: autoWinner
+    }
 }
 
 export function generateDoubleElimination(teams) {
-    if (!teams || teams.length < 2) return []
+    if (!Array.isArray(teams) || teams.length < 2) {
+        return []
+    }
+
+    const slots = seedBracketSlots(teams)
+    const bracketSize = slots.length
+
+    if (!isPowerOfTwo(bracketSize)) {
+        throw new Error('Bracket size must be a power of 2')
+    }
 
     const matches = []
-    const slots = seedBracketSlots(teams)
-    const winnersRounds = Math.log2(slots.length)
 
-    let entrants = slots
+    // -----------------------------
+    // WINNERS BRACKET
+    // -----------------------------
+    let entrants = [...slots]
+    const winnersRounds = Math.log2(bracketSize)
 
     for (let round = 1; round <= winnersRounds; round++) {
-        const nextEntrants = []
+        const nextRoundEntrants = []
 
         for (let i = 0; i < entrants.length; i += 2) {
             const home = round === 1 ? entrants[i] : null
             const away = round === 1 ? entrants[i + 1] : null
-            const autoWinner =
-                home?.id != null && away?.id == null
-                    ? home.id
-                    : away?.id != null && home?.id == null
-                        ? away.id
-                        : null
 
-            matches.push({
-                round_number: round,
-                match_number: i / 2 + 1,
-                home_team_id: home?.id ?? null,
-                away_team_id: away?.id ?? null,
-                match_type: 'winners',
-                is_placeholder: round !== 1,
-                auto_winner: autoWinner
-            })
+            let autoWinner = null
 
-            nextEntrants.push(null)
+            if (home?.id && !away?.id) {
+                autoWinner = home.id
+            } else if (away?.id && !home?.id) {
+                autoWinner = away.id
+            }
+
+            matches.push(
+                createMatch({
+                    round,
+                    matchNumber: i / 2 + 1,
+                    type: 'winners',
+                    home,
+                    away,
+                    placeholder: round !== 1,
+                    autoWinner
+                })
+            )
+
+            nextRoundEntrants.push(null)
         }
 
-        entrants = nextEntrants
+        entrants = nextRoundEntrants
     }
 
-    const losersRoundCounts = getLosersRoundCounts(slots.length)
+    // -----------------------------
+    // LOSERS BRACKET
+    // -----------------------------
+    const losersRounds = getLosersRoundCounts(bracketSize)
 
-    losersRoundCounts.forEach((matchCount, roundIndex) => {
+    losersRounds.forEach((matchCount, index) => {
+        const round = index + 1
+
         for (let matchNumber = 1; matchNumber <= matchCount; matchNumber++) {
-            matches.push({
-                round_number: roundIndex + 1,
-                match_number: matchNumber,
-                home_team_id: null,
-                away_team_id: null,
-                match_type: 'losers',
-                is_placeholder: true
-            })
+            matches.push(
+                createMatch({
+                    round,
+                    matchNumber,
+                    type: 'losers'
+                })
+            )
         }
     })
 
-    matches.push({
-        round_number: 1,
-        match_number: 1,
-        home_team_id: null,
-        away_team_id: null,
-        match_type: 'grand_final',
-        is_placeholder: true
-    })
+    // -----------------------------
+    // GRAND FINAL
+    // -----------------------------
+    matches.push(
+        createMatch({
+            round: 1,
+            matchNumber: 1,
+            type: 'grand_final'
+        })
+    )
 
     return matches
 }

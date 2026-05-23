@@ -23,8 +23,7 @@ export function buildSeedOrder(size) {
 export function seedBracketSlots(teams) {
     const size = nextPowerOfTwo(teams.length)
     const order = buildSeedOrder(size)
-
-    return order.map(seed => teams[seed - 1] || null)
+    return order.map(seed => teams[seed - 1] ?? null)
 }
 
 export function generateSingleElimination(
@@ -49,6 +48,7 @@ export function generateSingleElimination(
         for (let i = 0; i < entrants.length; i += 2) {
             const home = roundOffset === 0 ? entrants[i] : null
             const away = roundOffset === 0 ? entrants[i + 1] : null
+
             const autoWinner =
                 home?.id != null && away?.id == null
                     ? home.id

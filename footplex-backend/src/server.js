@@ -25,13 +25,19 @@ const tournamentSchema = {
         required: ['name', 'tournament_type', 'format', 'max_teams'],
         properties: {
             name: { type: 'string', minLength: 3 },
+            description: { type: ['string', 'null'] },
+            start_date: { type: ['string', 'null'] },
+            end_date: { type: ['string', 'null'] },
             tournament_type: { enum: ['physical', 'efootball', 'futsal'] },
             format: { type: 'string' },
             max_teams: { type: 'integer', minimum: 2 },
             group_count: { type: 'integer', minimum: 2 },
             teams_advance_per_group: { type: 'integer', minimum: 1 },
             is_double_round_robin: { type: 'boolean' },
-            is_two_legged_knockout: { type: 'boolean' }
+            is_two_legged_knockout: { type: 'boolean' },
+            penalties_enabled: { type: 'boolean' },
+            season_name: { type: 'string' },
+            series_id: { type: 'string' }
         }
     }
 }
@@ -63,7 +69,12 @@ const KNOCKOUT_MATCH_TYPES = new Set([
 ])
 
 await app.register(cors, { origin: '*', credentials: true, methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'] })
-await app.register(jwt, { secret: process.env.JWT_SECRET })
+await app.register(jwt, {
+    secret: process.env.JWT_SECRET,
+    sign: {
+        expiresIn: '7d'
+    }
+})
 await app.register(multipart, {
     limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit for files
 })
@@ -78,6 +89,7 @@ const authenticate = async (request, reply) => {
     try {
         await request.jwtVerify()
     } catch (err) {
+        console.error('AUTHENTICATION ERROR:', err.message);
         reply.status(401).send({ error: 'Unauthorized' })
     }
 }
@@ -307,11 +319,11 @@ app.post('/api/auth/login', async (request, reply) => {
     if (!valid) return reply.status(401).send({ error: 'Invalid email or password' })
 
     const token = app.jwt.sign({ id: user.id, email: user.email })
-    return { user: { id: user.id, email: user.email, full_name: user.full_name }, token }
+    return { user: { id: user.id, email: user.email, full_name: user.full_name, avatar_url: user.avatar_url }, token }
 })
 
 app.get('/api/auth/me', { preHandler: authenticate }, async request => {
-    const res = await pool.query('SELECT id,email,full_name,role FROM users WHERE id=$1', [request.user.id])
+    const res = await pool.query('SELECT id,email,full_name,role,avatar_url FROM users WHERE id=$1', [request.user.id])
     return { user: res.rows[0] }
 })
 
@@ -327,7 +339,10 @@ app.post('/api/tournaments', { preHandler: authenticate, schema: tournamentSchem
         group_count,
         teams_advance_per_group,
         is_double_round_robin,
-        is_two_legged_knockout
+        is_two_legged_knockout,
+        penalties_enabled,
+        season_name,
+        series_id
     } = request.body
 
     const res = await pool.query(
@@ -345,8 +360,11 @@ app.post('/api/tournaments', { preHandler: authenticate, schema: tournamentSchem
             group_count,
             teams_advance_per_group,
             is_double_round_robin,
-            is_two_legged_knockout
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,
+            is_two_legged_knockout,
+            penalties_enabled,
+            season_name,
+            series_id
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) RETURNING *`,
         [
             request.user.id,
             name,
@@ -361,7 +379,10 @@ app.post('/api/tournaments', { preHandler: authenticate, schema: tournamentSchem
             group_count || 2,
             teams_advance_per_group || 2,
             is_double_round_robin || false,
-            is_two_legged_knockout || false
+            is_two_legged_knockout || false,
+            penalties_enabled || false,
+            season_name || null,
+            series_id || null
         ]
     )
 
@@ -401,7 +422,35 @@ app.get('/api/tournaments/:slug', async (request, reply) => {
         [request.params.slug]
     )
     if (res.rows.length === 0) return reply.status(404).send({ error: 'Not found' })
-    return { tournament: res.rows[0] }
+    
+    const tournament = res.rows[0]
+    let seasons = []
+    if (tournament.series_id) {
+        // Fetches seasons and attempts to find the top team for completed seasons
+        const seasonsRes = await pool.query(`
+            SELECT t.name, t.slug, t.season_name, t.status, t.created_at,
+            (
+                SELECT name FROM teams 
+                WHERE tournament_id = t.id 
+                AND status = 'confirmed'
+                ORDER BY (
+                    SELECT COALESCE(SUM(CASE WHEN home_team_id = teams.id AND home_score > away_score THEN 3 
+                                            WHEN away_team_id = teams.id AND away_score > home_score THEN 3
+                                            WHEN home_score = away_score THEN 1 ELSE 0 END), 0)
+                    FROM matches WHERE tournament_id = t.id AND status = 'completed'
+                ) DESC,
+                (
+                    SELECT COALESCE(SUM(CASE WHEN home_team_id = teams.id THEN home_score - away_score 
+                                            WHEN away_team_id = teams.id THEN away_score - home_score ELSE 0 END), 0)
+                    FROM matches WHERE tournament_id = t.id AND status = 'completed'
+                ) DESC
+                LIMIT 1
+            ) as winner_name
+            FROM tournaments t WHERE series_id=$1 ORDER BY created_at DESC`,
+            [tournament.series_id]);
+        seasons = seasonsRes.rows
+    }
+    return { tournament, seasons }
 })
 
 app.patch('/api/tournaments/:id/status', { preHandler: authenticate }, async (request, reply) => {
@@ -418,6 +467,46 @@ app.patch('/api/tournaments/:id/status', { preHandler: authenticate }, async (re
     return { tournament: res.rows[0] }
 })
 
+app.patch('/api/tournaments/:id', { preHandler: authenticate, schema: tournamentSchema }, async (request, reply) => {
+    const id = parseInt(request.params.id, 10)
+    const tournament = await TournamentService.getForOwner(id, request.user.id)
+    if (!tournament) return reply.status(403).send({ error: 'Not authorized' })
+
+    const {
+        name,
+        tournament_type,
+        format,
+        max_teams,
+        description,
+        start_date,
+        end_date,
+        group_count,
+        teams_advance_per_group,
+        is_double_round_robin,
+        is_two_legged_knockout,
+        penalties_enabled,
+        season_name,
+        series_id
+    } = request.body
+
+    const res = await pool.query(
+        `UPDATE tournaments SET 
+            name=$1, slug=$2, tournament_type=$3, format=$4, max_teams=$5, 
+            description=$6, start_date=$7, end_date=$8, group_count=$9, 
+            teams_advance_per_group=$10, is_double_round_robin=$11, 
+            is_two_legged_knockout=$12, penalties_enabled=$13, season_name=$14, series_id=$15
+         WHERE id=$16 RETURNING *`,
+        [
+            name, buildSlug(name), tournament_type, format, max_teams,
+            description, start_date, end_date, group_count,
+            teams_advance_per_group, is_double_round_robin,
+            is_two_legged_knockout, penalties_enabled, season_name, series_id, id
+        ]
+    )
+    const updated = await pool.query("SELECT t.*, u.full_name AS organizer_name FROM tournaments t JOIN users u ON u.id=t.organizer_id WHERE t.id=$1", [id])
+    return { tournament: updated.rows[0] }
+})
+
 app.delete('/api/tournaments/:id', { preHandler: authenticate }, async (request, reply) => {
     const id = parseInt(request.params.id, 10)
     const tournament = await TournamentService.getForOwner(id, request.user.id)
@@ -425,6 +514,60 @@ app.delete('/api/tournaments/:id', { preHandler: authenticate }, async (request,
 
     await pool.query('DELETE FROM tournaments WHERE id=$1', [id])
     return { message: 'Deleted' }
+})
+
+app.post('/api/tournaments/:id/rollover', { preHandler: authenticate }, async (request, reply) => {
+    const id = parseInt(request.params.id, 10)
+    const { season_name, carry_teams } = request.body
+    
+    const old = await pool.query("SELECT * FROM tournaments WHERE id=$1 AND organizer_id=$2", [id, request.user.id])
+    if (old.rows.length === 0) return reply.status(403).send({ error: 'Not authorized' })
+    
+    const t = old.rows[0]
+    let seriesId = t.series_id
+    
+    // If this is the first rollover, generate a series_id for both
+    if (!seriesId) {
+        seriesId = `series-${Date.now()}`
+        await pool.query("UPDATE tournaments SET series_id=$1, season_name=$2 WHERE id=$3", [seriesId, t.season_name || 'Season 1', id])
+    }
+
+    const res = await pool.query(
+        `INSERT INTO tournaments (
+            organizer_id, name, slug, tournament_type, format, status, max_teams,
+            description, group_count, teams_advance_per_group, is_double_round_robin,
+            is_two_legged_knockout, penalties_enabled, series_id, season_name
+        ) VALUES ($1,$2,$3,$4,$5,'registration',$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,
+        [
+            request.user.id,
+            t.name,
+            buildSlug(t.name),
+            t.tournament_type,
+            t.format,
+            t.max_teams,
+            t.description,
+            t.group_count,
+            t.teams_advance_per_group,
+            t.is_double_round_robin,
+            t.is_two_legged_knockout,
+            t.penalties_enabled,
+            seriesId,
+            season_name
+        ]
+    )
+
+    const newTournament = res.rows[0];
+
+    if (carry_teams) {
+        await pool.query(
+            `INSERT INTO teams (tournament_id, name, contact_name, contact_email, status)
+             SELECT $1, name, contact_name, contact_email, 'confirmed'
+             FROM teams WHERE tournament_id = $2 AND status = 'confirmed'`,
+            [newTournament.id, id]
+        );
+    }
+    
+    return { tournament: newTournament }
 })
 
 app.post('/api/tournaments/:id/teams', { preHandler: authenticate }, async (request, reply) => {
@@ -487,7 +630,18 @@ app.post('/api/tournaments/:id/teams/request', async (request, reply) => {
         [tournamentId, name.trim(), contact_name?.trim() || null, contact_email?.trim() || null]
     )
 
-    return { team: result.rows[0], message: 'Team request submitted!' }
+    const newTeam = result.rows[0]
+
+    // Broadcast notification to connected WebSocket clients
+    const clients = chatClients.get(tournamentId)
+    if (clients) {
+        const payload = JSON.stringify({ type: 'new_team_request', team: newTeam })
+        clients.forEach(client => {
+            if (client.readyState === 1) client.send(payload)
+        })
+    }
+
+    return { team: newTeam, message: 'Team request submitted!' }
 })
 
 app.get('/api/tournaments/:id/teams', async request => {
@@ -657,7 +811,8 @@ app.patch('/api/tournaments/:id/matches/:matchId/score', { preHandler: authentic
         const knockoutDraw =
             isDraw(home_score, away_score) &&
             (format === 'single_elim' || format === 'double_elim' || (format === 'group_knockout' && isKnockoutMatch(match))) &&
-            !tournament.is_two_legged_knockout;
+            !tournament.is_two_legged_knockout &&
+            tournament.penalties_enabled;
 
         // If it's a knockout draw and no penalties were provided, reject it
         if (knockoutDraw && (home_penalty_score === undefined || away_penalty_score === undefined)) {
@@ -844,6 +999,63 @@ app.post('/api/tournaments/:tournamentId/teams/:teamId/logo', { preHandler: auth
     }
 });
 
+app.post('/api/users/me/avatar', { preHandler: authenticate }, async (request, reply) => {
+    const data = await request.file();
+    if (!data) return reply.status(400).send({ error: 'No image provided' });
+
+    try {
+        const buffer = await data.toBuffer();
+        const uploadResult = await new Promise((resolve, reject) => {
+            cloudinary.uploader.upload_stream({ folder: 'footplex/avatars' }, (error, result) => {
+                if (error) reject(error);
+                resolve(result);
+            }).end(buffer);
+        });
+
+        const updated = await pool.query('UPDATE users SET avatar_url=$1 WHERE id=$2 RETURNING avatar_url', [uploadResult.secure_url, request.user.id]);
+        return { avatar_url: updated.rows[0].avatar_url };
+    } catch (err) {
+        console.error('AVATAR UPLOAD ERROR:', err.message || err);
+        return reply.status(500).send({ error: 'Upload failed' });
+    }
+});
+
+app.patch('/api/users/me', { preHandler: authenticate }, async (request, reply) => {
+    const { full_name } = request.body
+    if (!full_name?.trim()) return reply.status(400).send({ error: 'Name required' })
+
+    const res = await pool.query(
+        'UPDATE users SET full_name=$1 WHERE id=$2 RETURNING id, email, full_name, role, avatar_url',
+        [full_name.trim(), request.user.id]
+    )
+    return { user: res.rows[0] }
+})
+
+app.post('/api/tournaments/:id/banner', { preHandler: authenticate }, async (request, reply) => {
+    const id = parseInt(request.params.id, 10);
+    const tournament = await TournamentService.getForOwner(id, request.user.id);
+    if (!tournament) return reply.status(403).send({ error: 'Not authorized' });
+
+    const data = await request.file();
+    if (!data) return reply.status(400).send({ error: 'No image provided' });
+
+    try {
+        const buffer = await data.toBuffer();
+        const uploadResult = await new Promise((resolve, reject) => {
+            cloudinary.uploader.upload_stream({ folder: `footplex/banners/${id}` }, (error, result) => {
+                if (error) reject(error);
+                resolve(result);
+            }).end(buffer);
+        });
+
+        const updated = await pool.query('UPDATE tournaments SET banner_url=$1 WHERE id=$2 RETURNING banner_url', [uploadResult.secure_url, id]);
+        return { banner_url: updated.rows[0].banner_url };
+    } catch (err) {
+        console.error('BANNER UPLOAD ERROR:', err.message || err);
+        return reply.status(500).send({ error: 'Upload failed' });
+    }
+});
+
 app.get('/api/tournaments/:id/standings', async request => {
     const tournamentId = parseInt(request.params.id, 10)
     const standings = await TournamentService.getStandings(tournamentId)
@@ -853,7 +1065,10 @@ app.get('/api/tournaments/:id/standings', async request => {
 app.get('/api/tournaments/:id/messages', async request => {
     const tournamentId = parseInt(request.params.id, 10)
     const result = await pool.query(
-        'SELECT * FROM messages WHERE tournament_id=$1 ORDER BY created_at DESC LIMIT 50',
+        `SELECT m.*, u.avatar_url 
+         FROM messages m
+         LEFT JOIN users u ON u.full_name = m.sender_name
+         WHERE m.tournament_id=$1 ORDER BY m.created_at DESC LIMIT 50`,
         [tournamentId]
     )
     return { messages: result.rows }
@@ -872,7 +1087,12 @@ app.post('/api/tournaments/:id/messages', async (request, reply) => {
         [tournamentId, sender_name.trim(), content.trim()]
     )
 
-    const newMessage = result.rows[0]
+    // Fetch the avatar to include in the broadcast
+    const userRes = await pool.query('SELECT avatar_url FROM users WHERE full_name=$1 LIMIT 1', [sender_name.trim()])
+    const newMessage = { 
+        ...result.rows[0], 
+        avatar_url: userRes.rows[0]?.avatar_url || null 
+    }
 
     // Broadcast to connected WebSocket clients for this tournament
     const clients = chatClients.get(tournamentId)
@@ -911,7 +1131,7 @@ app.get('/api/tournaments/:id/groups', async request => {
 })
 
 app.setErrorHandler((error, request, reply) => {
-    console.error(error)
+    console.error('SERVER ERROR:', { method: request.method, url: request.url, message: error.message, stack: error.stack });
     reply.status(error.statusCode || 500).send({ error: error.message })
 })
 
