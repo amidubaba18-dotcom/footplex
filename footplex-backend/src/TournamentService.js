@@ -1,65 +1,92 @@
-import pool from './plugins/db.js'; // Corrected path for clarity and consistency
-import { getSwissRounds } from './tournament-engine/swiss.js';
-import { MatchService } from './MatchService.js'; // Import MatchService to pass to getGroupsData's standings
+import pool from './plugins/db.js'
+import { getSwissRounds } from './tournament-engine/swiss.js'
+import { MatchService } from './MatchService.js'
+
+// ─── INPUT VALIDATION HELPERS ────────────────────────────────────────────────
+function assertPositiveInteger(val, name) {
+    const n = parseInt(val, 10)
+    if (!Number.isFinite(n) || n <= 0 || String(n) !== String(val)) {
+        throw new Error(`${name} must be a positive integer`)
+    }
+    return n
+}
+
+function assertStringOrNull(val, name) {
+    if (val === null || val === undefined) return null
+    if (typeof val !== 'string') {
+        throw new Error(`${name} must be a string or null`)
+    }
+    // Prevent injection of control characters
+    const clean = val.replace(/[\x00-\x1F\x7F]/g, '').trim()
+    if (clean.length > 120) {
+        throw new Error(`${name} exceeds maximum length of 120 characters`)
+    }
+    return clean
+}
 
 export const TournamentService = {
     async getForOwner(tournamentId, userId) {
+        const tid = assertPositiveInteger(tournamentId, 'tournamentId')
+        const uid = assertPositiveInteger(userId, 'userId')
         const result = await pool.query(
             'SELECT * FROM tournaments WHERE id=$1 AND organizer_id=$2',
-            [tournamentId, userId]
-        );
-        return result.rows[0] || null;
+            [tid, uid]
+        )
+        return result.rows[0] || null
     },
 
     async getConfirmedTeams(tournamentId) {
+        const tid = assertPositiveInteger(tournamentId, 'tournamentId')
         const result = await pool.query(
             'SELECT * FROM teams WHERE tournament_id=$1 AND status=$2 ORDER BY id ASC',
-            [tournamentId, 'confirmed']
-        );
-        return result.rows;
+            [tid, 'confirmed']
+        )
+        return result.rows
     },
 
     async markCompleted(tournamentId) {
+        const tid = assertPositiveInteger(tournamentId, 'tournamentId')
         await pool.query(
             'UPDATE tournaments SET status=$1 WHERE id=$2',
-            ['completed', tournamentId]
-        );
+            ['completed', tid]
+        )
     },
 
     async maybeCompleteLeague(tournamentId, format) {
-        if (!['round_robin', 'swiss'].includes(format)) return;
+        const tid = assertPositiveInteger(tournamentId, 'tournamentId')
+        if (!['round_robin', 'swiss'].includes(format)) return
 
         const pendingResult = await pool.query(
             "SELECT COUNT(*) AS count FROM matches WHERE tournament_id=$1 AND status='scheduled'",
-            [tournamentId]
-        );
+            [tid]
+        )
 
-        if (parseInt(pendingResult.rows[0].count, 10) > 0) return;
+        if (parseInt(pendingResult.rows[0].count, 10) > 0) return
 
         if (format === 'swiss') {
-            const teams = await this.getConfirmedTeams(tournamentId);
-            const maxRounds = getSwissRounds(teams.length);
+            const teams = await this.getConfirmedTeams(tid)
+            const maxRounds = getSwissRounds(teams.length)
             const roundsResult = await pool.query(
                 'SELECT COALESCE(MAX(round_number), 0) AS max_round FROM matches WHERE tournament_id=$1',
-                [tournamentId]
-            );
-            if (parseInt(roundsResult.rows[0].max_round, 10) < maxRounds) return;
+                [tid]
+            )
+            if (parseInt(roundsResult.rows[0].max_round, 10) < maxRounds) return
         }
 
-        await this.markCompleted(tournamentId);
+        await this.markCompleted(tid)
     },
 
     async getGroupsData(tournamentId, db = pool) {
+        const tid = assertPositiveInteger(tournamentId, 'tournamentId')
         const groupsResult = await db.query(
             'SELECT DISTINCT group_name FROM matches WHERE tournament_id=$1 AND group_name IS NOT NULL ORDER BY group_name',
-            [tournamentId]
-        );
+            [tid]
+        )
 
-        const groups = [];
+        const groups = []
         for (const row of groupsResult.rows) {
-            const groupName = row.group_name;
-            // When getting group data, we also want group standings
-            const standings = await this.getStandings(tournamentId, groupName, db);
+            const groupName = row.group_name
+            const standings = await this.getStandings(tid, groupName, db)
             const fixturesResult = await db.query(
                 `SELECT m.*, ht.name AS home_team_name, at.name AS away_team_name
                  FROM matches m
@@ -67,19 +94,22 @@ export const TournamentService = {
                  LEFT JOIN teams at ON at.id=m.away_team_id
                  WHERE m.tournament_id=$1 AND m.group_name=$2
                  ORDER BY m.round_number, m.match_number`,
-                [tournamentId, groupName]
-            );
+                [tid, groupName]
+            )
 
             groups.push({
                 name: groupName,
-                standings: standings, // Include standings here
+                standings: standings,
                 fixtures: fixturesResult.rows
-            });
+            })
         }
-        return groups;
+        return groups
     },
 
     async getStandings(tournamentId, groupName = null, db = pool) {
+        const tid = assertPositiveInteger(tournamentId, 'tournamentId')
+        const gName = assertStringOrNull(groupName, 'groupName')
+
         const result = await db.query(
             `WITH scoped_matches AS (
                 SELECT * FROM matches
@@ -118,10 +148,10 @@ export const TournamentService = {
               ))
             GROUP BY t.id, t.name
             ORDER BY points DESC, goal_difference DESC, goals_for DESC, goals_away DESC, name ASC`,
-            [tournamentId, groupName]
-        );
-        return result.rows;
+            [tid, gName]
+        )
+        return result.rows
     }
-};
+}
 
-export default TournamentService;
+export default TournamentService
