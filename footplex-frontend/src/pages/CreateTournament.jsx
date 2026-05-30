@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../lib/api'
-import Navigation from '../components/Navigation'
+import Navigation from '../Components/Navigation'
 
 
 const BRACKET_FORMATS = new Set([
@@ -90,6 +90,12 @@ const StadiumHero = () => (
         <path d="M600 90 L605 80 M605 80 L610 90" stroke="#e5b186" strokeWidth="1.5" opacity="0.2" strokeLinecap="round" />
         <circle cx="250" cy="100" r="2" fill="#da513f" opacity="0.15" />
         <circle cx="580" cy="110" r="2" fill="#92cfc6" opacity="0.15" />
+    </svg>
+)
+
+const ArrowLeftIcon = ({ className }) => (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="m15 18-6-6 6-6" />
     </svg>
 )
 
@@ -217,7 +223,7 @@ export default function CreateTournament() {
                     }
                 })
             }
-            if (tournamentId) navigate(`/manage/${tournamentId}`)
+            if (tournamentId) navigate(`/t/${res.data.tournament.slug}`)
         } catch (err) {
             setError(err.response?.data?.error || 'Failed to create tournament')
             setLoading(false)
@@ -235,13 +241,21 @@ export default function CreateTournament() {
 
             {/* ─── Header ─── */}
             <nav className="sticky top-0 z-50 bg-[#fefcf2]/90 backdrop-blur-md border-b border-[#e5b186]/40">
-                
+
             </nav>
 
             {/* ─── Hero (compact on mobile) ─── */}
             <div className="relative bg-gradient-to-b from-[#f5debe]/30 to-[#fefcf2]">
                 <div className="max-w-xl mx-auto px-4 pt-6 pb-4 md:pt-10 md:pb-6 relative">
                     <StadiumHero />
+                    <div className="lg:hidden absolute left-4 top-6 md:top-10 z-20">
+                        <button
+                            onClick={() => navigate(-1)}
+                            className="flex-shrink-0 w-9 h-9 flex items-center justify-center rounded-xl text-[#6b6357] hover:text-[#1a1612] hover:bg-[#f5debe]/50 transition-colors bg-white/50 backdrop-blur-sm shadow-sm border border-[#e5b186]/30"
+                        >
+                            <ArrowLeftIcon className="w-5 h-5" />
+                        </button>
+                    </div>
                     <div className="relative z-10 text-center">
 
                         <h1 className="text-2xl md:text-3xl font-black text-[#5c3d2e] tracking-tight leading-tight">

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import Avatar from './Avatar'
@@ -57,6 +57,10 @@ export default function Navigation({ isCollapsed, setIsCollapsed }) {
     const { user, logout } = useAuth()
     const [mobileOpen, setMobileOpen] = useState(false)
 
+    useEffect(() => {
+        setMobileOpen(location.hash === '#menu')
+    }, [location.hash])
+
     if (!user) return null
 
     const isActive = (path) => location.pathname === path
@@ -64,16 +68,19 @@ export default function Navigation({ isCollapsed, setIsCollapsed }) {
     const navItems = [
         { path: '/dashboard', label: 'Home', icon: BrowseIcon },
         { path: '/my-events', label: 'My Events', icon: MyEventsIcon },
-        { path: '/create', label: 'Editor\'s Picks', icon: CreateIcon }, // Renamed slightly to mirror image feel, revert if needed
+        { path: '/create', label: 'Create', icon: CreateIcon }, // Renamed slightly to mirror image feel, revert if needed
         { path: '/profile', label: 'Profile', icon: ProfileIcon },
         { path: '/notifications', label: 'Notifications', icon: NotificationsIcon },
     ]
+
+    const handleOpenMenu = () => navigate(location.pathname + location.search + '#menu')
+    const handleCloseMenu = () => location.hash === '#menu' ? navigate(-1) : setMobileOpen(false)
 
     return (
         <>
             {/* ─── Mobile Top Bar ─── */}
             <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-white text-gray-900 flex items-center justify-between px-4 z-40 border-b border-gray-100 shadow-sm">
-                <button onClick={() => setMobileOpen(true)} className="p-2 text-gray-600 hover:text-gray-900 transition-colors">
+                <button onClick={handleOpenMenu} className="p-2 text-gray-600 hover:text-gray-900 transition-colors">
                     <IconMenu />
                 </button>
                 <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('/dashboard')}>
@@ -86,7 +93,7 @@ export default function Navigation({ isCollapsed, setIsCollapsed }) {
             {mobileOpen && (
                 <div
                     className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[60] lg:hidden transition-opacity"
-                    onClick={() => setMobileOpen(false)}
+                    onClick={handleCloseMenu}
                 />
             )}
 
@@ -97,7 +104,7 @@ export default function Navigation({ isCollapsed, setIsCollapsed }) {
                     {/* Drawer Header - Matches Image exactly */}
                     <div className="p-6 relative">
                         <button
-                            onClick={() => setMobileOpen(false)}
+                            onClick={handleCloseMenu}
                             className="absolute top-6 right-6 p-1 text-gray-500 hover:text-gray-900 transition-colors"
                         >
                             <IconClose />
@@ -125,7 +132,7 @@ export default function Navigation({ isCollapsed, setIsCollapsed }) {
                             return (
                                 <button
                                     key={item.path}
-                                    onClick={() => { navigate(item.path); setMobileOpen(false); }}
+                                    onClick={() => navigate(item.path)}
                                     className={`w-full text-left px-4 py-3.5 rounded-lg flex items-center gap-5 transition-colors ${isActive(item.path)
                                         ? 'bg-gray-100 text-gray-900 font-medium'
                                         : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'

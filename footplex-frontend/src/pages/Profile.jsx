@@ -13,11 +13,11 @@ const ProfileArenaBg = () => (
             <radialGradient id="spotlight" cx="50%" cy="0%" r="80%">
                 <stop offset="0%" stopColor="#da513f" stopOpacity="0.15" />
                 <stop offset="50%" stopColor="#92cfc6" stopOpacity="0.05" />
-                <stop offset="100%" stopColor="#0f172a" stopOpacity="0" />
+                <stop offset="100%" stopColor="#fefcf2" stopOpacity="0" />
             </radialGradient>
             <linearGradient id="floorGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#5c3d2e" stopOpacity="0.1" />
-                <stop offset="100%" stopColor="#0f172a" stopOpacity="0" />
+                <stop offset="0%" stopColor="#f5debe" stopOpacity="0.2" />
+                <stop offset="100%" stopColor="#fefcf2" stopOpacity="0" />
             </linearGradient>
         </defs>
 
@@ -53,8 +53,8 @@ const ProfileArenaBg = () => (
         <circle cx="350" cy="90" r="1.5" fill="#e5b186" opacity="0.2" />
 
         {/* Scoreboard */}
-        <rect x="320" y="40" width="160" height="40" rx="4" stroke="#334155" strokeWidth="1" fill="none" opacity="0.2" />
-        <line x1="400" y1="40" x2="400" y2="80" stroke="#334155" strokeWidth="1" opacity="0.15" />
+        <rect x="320" y="40" width="160" height="40" rx="4" stroke="#e5b186" strokeWidth="1" fill="none" opacity="0.2" />
+        <line x1="400" y1="40" x2="400" y2="80" stroke="#e5b186" strokeWidth="1" opacity="0.15" />
     </svg>
 )
 
@@ -107,6 +107,12 @@ const MailIcon = ({ className }) => (
 const CrownIcon = ({ className }) => (
     <svg viewBox="0 0 24 24" fill="none" className={className} stroke="currentColor" strokeWidth="1.5">
         <path d="M2 4l3 12h14l3-12-6 7-4-7-4 7-6-7zm3 16h14" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+)
+
+const ArrowLeftIcon = ({ className }) => (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="m15 18-6-6 6-6" />
     </svg>
 )
 
@@ -170,34 +176,40 @@ export default function Profile() {
     }
 
     return (
-        <div className="min-h-screen bg-[#0f172a] text-[#f8fafc] relative overflow-hidden">
+        <div className="min-h-screen bg-[#fefcf2] text-[#5c3d2e] relative overflow-hidden">
 
             {/* Background texture */}
             <div className="fixed inset-0 pointer-events-none opacity-[0.02]"
                 style={{ backgroundImage: 'radial-gradient(#da513f 1px, transparent 1px)', backgroundSize: '32px 32px' }} />
 
             {/* ─── Hero Header with Arena BG ─── */}
-            <div className="relative bg-gradient-to-b from-[#1e293b] to-[#0f172a] overflow-hidden">
+            <div className="relative bg-gradient-to-b from-[#f5debe]/30 to-[#fefcf2] overflow-hidden border-b border-[#ede8de]">
                 <div className="absolute inset-0">
                     <ProfileArenaBg />
                 </div>
                 <div className="relative z-10 max-w-2xl mx-auto px-4 pt-8 pb-6">
-                    <div className="flex items-center gap-2 mb-4">
-                        
+                    <div className="flex items-center gap-4 mb-4">
+                        <button
+                            onClick={() => navigate(-1)}
+                            className="lg:hidden flex-shrink-0 w-9 h-9 flex items-center justify-center rounded-xl text-[#6b6357] hover:text-[#1a1612] hover:bg-[#f5debe]/50 transition-colors bg-white/50 backdrop-blur-sm shadow-sm border border-[#e5b186]/30"
+                        >
+                            <ArrowLeftIcon className="w-5 h-5" />
+                        </button>
+                        <div className="w-10 h-0.5 bg-[#da513f] rounded-full" />
                     </div>
-                    <h1 className="text-3xl font-black tracking-tight leading-tight">
+                    <h1 className="text-3xl font-black tracking-tight leading-tight text-[#5c3d2e]">
                         My <span className="text-[#da513f]">Profile</span>
                     </h1>
-                    <p className="text-sm text-[#94a3b8] mt-1 max-w-xs">
+                    <p className="text-sm text-[#957467] mt-1 max-w-xs">
                         Manage your account, avatar, and preferences
                     </p>
                 </div>
             </div>
 
-            <div className="max-w-2xl mx-auto px-4 pb-24 relative z-10 -mt-2 space-y-4">
+            <div className="max-w-2xl mx-auto px-4 pb-24 relative z-10 mt-6 space-y-4">
 
                 {/* ─── Avatar Card ─── */}
-                <div className="bg-[#1e293b] rounded-2xl border border-[#334155]/60 p-5 shadow-xl shadow-black/20">
+                <div className="bg-white/90 backdrop-blur-sm rounded-2xl border border-[#ede8de] p-5 shadow-sm">
                     <div className="flex items-center gap-5">
                         {/* Avatar with glow ring */}
                         <div className="relative">
@@ -207,26 +219,26 @@ export default function Profile() {
                                 name={user?.full_name}
                                 size="w-20 h-20"
                                 rounded="rounded-full"
-                                border="border-[#334155]"
+                                border="border-white"
                                 text_size="text-2xl"
                             />
                             {/* Online indicator */}
-                            <div className="absolute bottom-0.5 right-0.5 w-4 h-4 rounded-full bg-[#10b981] border-2 border-[#1e293b]" />
+                            <div className="absolute bottom-0.5 right-0.5 w-4 h-4 rounded-full bg-[#10b981] border-2 border-white" />
                         </div>
 
                         <div className="flex-1 min-w-0">
-                            <h2 className="font-bold text-[#f8fafc] text-lg leading-tight">{user?.full_name || 'Player'}</h2>
-                            <p className="text-xs text-[#94a3b8] mt-0.5">{user?.email}</p>
+                            <h2 className="font-bold text-[#1a1612] text-lg leading-tight">{user?.full_name || 'Player'}</h2>
+                            <p className="text-xs text-[#9b8e80] mt-0.5">{user?.email}</p>
                             <div className="flex items-center gap-2 mt-2">
                                 <button
                                     onClick={() => fileInputRef.current?.click()}
                                     disabled={uploading}
-                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#da513f]/10 hover:bg-[#da513f]/20 border border-[#da513f]/30 text-[#da513f] text-xs font-bold rounded-lg transition-all active:scale-95 disabled:opacity-40"
+                                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#f5debe]/50 hover:bg-[#f5debe] border border-[#e5b186]/50 text-[#7a6040] text-xs font-bold rounded-xl transition-all active:scale-95 disabled:opacity-40"
                                 >
                                     <CameraIcon className="w-3.5 h-3.5" />
                                     {uploading ? 'Uploading...' : 'Change'}
                                 </button>
-                                <span className="text-[10px] text-[#94a3b8]">JPG, PNG up to 5MB</span>
+
                             </div>
                             <input ref={fileInputRef} type="file" accept="image/*" onChange={handleAvatarChange} className="hidden" />
                         </div>
@@ -234,18 +246,18 @@ export default function Profile() {
                 </div>
 
                 {/* ─── Account Info Card ─── */}
-                <div className="bg-[#1e293b] rounded-2xl border border-[#334155]/60 p-5 shadow-xl shadow-black/20">
+                <div className="bg-white/90 backdrop-blur-sm rounded-2xl border border-[#ede8de] p-5 shadow-sm">
                     <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center gap-2">
-                            <div className="w-7 h-7 rounded-lg bg-[#92cfc6]/10 border border-[#92cfc6]/20 flex items-center justify-center">
+                            <div className="w-8 h-8 rounded-xl bg-[#92cfc6]/15 border border-[#92cfc6]/30 flex items-center justify-center">
                                 <UserIcon className="w-3.5 h-3.5 text-[#92cfc6]" />
                             </div>
-                            <h2 className="font-bold text-[#f8fafc] text-sm">Account Info</h2>
+                            <h2 className="font-bold text-[#1a1612] text-sm">Account Details</h2>
                         </div>
                         {!isEditing && (
                             <button
                                 onClick={() => { setIsEditing(true); setEditName(user?.full_name || '') }}
-                                className="flex items-center gap-1 px-2.5 py-1 bg-[#334155]/40 hover:bg-[#334155]/60 text-[#94a3b8] hover:text-[#f8fafc] text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all"
+                                className="flex items-center gap-1 px-3 py-1.5 bg-[#f5debe]/40 hover:bg-[#f5debe]/60 text-[#9b8e80] hover:text-[#7a6040] text-[10px] font-black uppercase tracking-widest rounded-lg transition-all border border-[#e8d9b4]/50"
                             >
                                 <PencilIcon className="w-3 h-3" />
                                 Edit
@@ -255,8 +267,8 @@ export default function Profile() {
 
                     <div className="space-y-3">
                         {/* Name Field */}
-                        <div className="bg-[#0f172a]/60 rounded-xl border border-[#334155]/40 p-3">
-                            <label className="flex items-center gap-1.5 text-[10px] font-bold text-[#94a3b8] uppercase tracking-wider mb-1.5">
+                        <div className="bg-[#fcfaf5] rounded-xl border border-[#ede8de]/60 p-4">
+                            <label className="flex items-center gap-1.5 text-[10px] font-bold text-[#9b8e80] uppercase tracking-[0.15em] mb-2">
                                 <UserIcon className="w-3 h-3" />
                                 Full Name
                             </label>
@@ -265,7 +277,7 @@ export default function Profile() {
                                     <input
                                         value={editName}
                                         onChange={e => setEditName(e.target.value)}
-                                        className="flex-1 bg-[#1e293b] border border-[#334155] rounded-lg px-3 py-2 text-sm text-[#f8fafc] placeholder-[#94a3b8] focus:outline-none focus:ring-2 focus:ring-[#da513f]/30 focus:border-[#da513f]/50 transition-all"
+                                        className="flex-1 bg-white border border-[#e8e2d6] rounded-xl px-3.5 py-2.5 text-sm text-[#1a1612] placeholder-[#9b8e80]/40 focus:outline-none focus:ring-2 focus:ring-[#dc574b]/10 focus:border-[#dc574b]/40 transition-all shadow-sm"
                                         autoFocus
                                     />
                                     <button
@@ -277,33 +289,33 @@ export default function Profile() {
                                     <button
                                         type="button"
                                         onClick={() => setIsEditing(false)}
-                                        className="px-3 py-2 bg-[#334155] hover:bg-[#475569] text-[#94a3b8] rounded-lg text-xs font-bold active:scale-95 transition-all"
+                                        className="px-3 py-2 bg-[#f5debe]/50 text-[#7a6040] rounded-lg text-xs font-bold active:scale-95 transition-all"
                                     >
                                         Cancel
                                     </button>
                                 </form>
                             ) : (
-                                <p className="text-[#f8fafc] font-medium text-sm">{user?.full_name || '—'}</p>
+                                <p className="text-[#1a1612] font-bold text-sm">{user?.full_name || '—'}</p>
                             )}
                         </div>
 
                         {/* Email Field */}
-                        <div className="bg-[#0f172a]/60 rounded-xl border border-[#334155]/40 p-3">
-                            <label className="flex items-center gap-1.5 text-[10px] font-bold text-[#94a3b8] uppercase tracking-wider mb-1.5">
+                        <div className="bg-[#fcfaf5] rounded-xl border border-[#ede8de]/60 p-4">
+                            <label className="flex items-center gap-1.5 text-[10px] font-bold text-[#9b8e80] uppercase tracking-[0.15em] mb-2">
                                 <MailIcon className="w-3 h-3" />
                                 Email
                             </label>
-                            <p className="text-[#f8fafc] font-medium text-sm">{user?.email || '—'}</p>
+                            <p className="text-[#1a1612] font-bold text-sm">{user?.email || '—'}</p>
                         </div>
 
                         {/* Role Field */}
-                        <div className="bg-[#0f172a]/60 rounded-xl border border-[#334155]/40 p-3">
-                            <label className="flex items-center gap-1.5 text-[10px] font-bold text-[#94a3b8] uppercase tracking-wider mb-1.5">
+                        <div className="bg-[#fcfaf5] rounded-xl border border-[#ede8de]/60 p-4">
+                            <label className="flex items-center gap-1.5 text-[10px] font-bold text-[#9b8e80] uppercase tracking-[0.15em] mb-2">
                                 <CrownIcon className="w-3 h-3" />
                                 Role
                             </label>
                             <div className="flex items-center gap-2">
-                                <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-[#e5b186]/10 border border-[#e5b186]/20 text-[#e5b186] text-xs font-bold uppercase">
+                                <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-[#e5b186]/15 border border-[#e5b186]/30 text-[#7a6040] text-[10px] font-black uppercase tracking-widest">
                                     {user?.role || 'Player'}
                                 </span>
                             </div>
@@ -311,7 +323,7 @@ export default function Profile() {
                     </div>
                 </div>
 
-                
+
 
                 {/* ─── Danger Zone ─── */}
                 <div className="bg-gradient-to-br from-[#ef4444]/5 to-transparent rounded-2xl border border-[#ef4444]/20 p-5">
@@ -321,12 +333,12 @@ export default function Profile() {
                         </div>
                         <h2 className="font-bold text-[#ef4444] text-sm">Danger Zone</h2>
                     </div>
-                    <p className="text-xs text-[#94a3b8] mb-4 leading-relaxed">
+                    <p className="text-xs text-[#9b8e80] mb-4 leading-relaxed font-medium">
                         Deleting your account is permanent. All tournaments, matches, and data will be permanently erased.
                     </p>
                     <button
                         onClick={() => setShowDeleteConfirm(true)}
-                        className="w-full sm:w-auto px-5 py-2.5 bg-[#ef4444]/10 hover:bg-[#ef4444]/20 border border-[#ef4444]/30 text-[#ef4444] text-xs font-bold uppercase tracking-wider rounded-xl active:scale-95 transition-all"
+                        className="w-full sm:w-auto px-6 py-2.5 bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 text-[10px] font-black uppercase tracking-widest rounded-xl active:scale-95 transition-all"
                     >
                         Delete Account
                     </button>
@@ -335,7 +347,7 @@ export default function Profile() {
                 {/* ─── Sign Out ─── */}
                 <button
                     onClick={logout}
-                    className="w-full py-3 bg-[#334155]/30 hover:bg-[#334155]/50 border border-[#334155]/40 text-[#94a3b8] hover:text-[#f8fafc] text-xs font-bold uppercase tracking-wider rounded-xl active:scale-[0.98] transition-all"
+                    className="w-full py-4 bg-white hover:bg-[#fcfaf5] border border-[#ede8de] text-[#9b8e80] hover:text-[#1a1612] text-[10px] font-black uppercase tracking-[0.2em] rounded-2xl active:scale-[0.98] transition-all shadow-sm"
                 >
                     Sign Out
                 </button>
@@ -343,27 +355,27 @@ export default function Profile() {
 
             {/* ─── Delete Confirmation Modal ─── */}
             {showDeleteConfirm && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-[#1e293b] rounded-2xl border border-[#334155] p-6 max-w-sm w-full shadow-2xl shadow-black/40">
-                        <div className="w-12 h-12 mx-auto mb-4 rounded-xl bg-[#ef4444]/10 border border-[#ef4444]/20 flex items-center justify-center">
+                <div className="fixed inset-0 bg-[#1a1612]/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-[#fefcf2] rounded-3xl border border-[#ede8de] p-8 max-w-sm w-full shadow-2xl">
+                        <div className="w-14 h-14 mx-auto mb-5 rounded-2xl bg-red-50 border border-red-100 flex items-center justify-center">
                             <TrashIcon className="w-6 h-6 text-[#ef4444]" />
                         </div>
-                        <h3 className="text-lg font-black text-[#f8fafc] text-center mb-2">Delete Account?</h3>
-                        <p className="text-xs text-[#94a3b8] text-center mb-6 leading-relaxed">
+                        <h3 className="text-xl font-black text-[#1a1612] text-center mb-2 tracking-tight">Delete Account?</h3>
+                        <p className="text-xs text-[#9b8e80] text-center mb-8 leading-relaxed font-medium">
                             This action cannot be undone. All your tournaments, matches, and personal data will be permanently erased from our servers.
                         </p>
-                        <div className="flex gap-3">
-                            <button
-                                onClick={() => setShowDeleteConfirm(false)}
-                                className="flex-1 py-2.5 bg-[#334155] hover:bg-[#475569] text-[#94a3b8] rounded-xl text-xs font-bold uppercase tracking-wider active:scale-95 transition-all"
-                            >
-                                Cancel
-                            </button>
+                        <div className="flex flex-col gap-3">
                             <button
                                 onClick={handleDeleteAccount}
-                                className="flex-1 py-2.5 bg-[#ef4444] hover:bg-[#dc2626] text-white rounded-xl text-xs font-bold uppercase tracking-wider active:scale-95 transition-all"
+                                className="w-full py-3.5 bg-red-600 hover:bg-red-700 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest active:scale-95 transition-all shadow-lg shadow-red-200"
                             >
-                                Delete
+                                Delete Permanently
+                            </button>
+                            <button
+                                onClick={() => setShowDeleteConfirm(false)}
+                                className="w-full py-3.5 bg-[#f5debe]/40 text-[#7a6040] rounded-2xl text-[10px] font-black uppercase tracking-widest active:scale-95 transition-all border border-[#e8d9b4]/50"
+                            >
+                                Cancel
                             </button>
                         </div>
                     </div>

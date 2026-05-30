@@ -90,9 +90,18 @@ export default function TournamentCard({ t, user, onClick }) {
 
             {/* ═══ Bottom Content Container ═══ */}
             <div className="p-4 flex flex-col w-full">
-                <h3 className="font-semibold text-sm text-gray-900 leading-snug group-hover:text-gray-600 transition-colors line-clamp-2">
+                <h3 className="font-bold text-sm text-gray-900 leading-snug group-hover:text-[#dc574b] transition-colors line-clamp-1">
                     {t.name}
                 </h3>
+                {t.description && (
+                    <p className="text-[11px] text-gray-500 mt-1 line-clamp-2 leading-relaxed">
+                        {t.description}
+                    </p>
+                )}
+                <p className="text-[10px] font-bold text-[#957467] uppercase tracking-wider mt-2 flex items-center gap-1.5">
+                    <span className="w-1 h-1 rounded-full bg-[#e5b186]" />
+                    {t.format?.replace(/_/g, ' ')}
+                </p>
                 <div className="flex items-center gap-2 mt-2">
                     <Avatar
                         src={t.organizer_avatar}

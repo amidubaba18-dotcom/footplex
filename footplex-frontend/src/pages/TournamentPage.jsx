@@ -213,17 +213,32 @@ const Icons = {
             <circle cx="12" cy="13" r="4" />
         </svg>
     ),
+    medalGold: ({ className }) => (
+        <svg className={className} viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6M18 9h1.5a2.5 2.5 0 0 0 0-5H18M4 22h16M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22M18 2H6v7a6 6 0 0 0 12 0V2Z" fill="#fbbf24" />
+        </svg>
+    ),
+    medalSilver: ({ className }) => (
+        <svg className={className} viewBox="0 0 24 24" fill="none" stroke="#475569" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6M18 9h1.5a2.5 2.5 0 0 0 0-5H18M4 22h16M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22M18 2H6v7a6 6 0 0 0 12 0V2Z" fill="#cbd5e1" />
+        </svg>
+    ),
+    medalBronze: ({ className }) => (
+        <svg className={className} viewBox="0 0 24 24" fill="none" stroke="#78350f" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6M18 9h1.5a2.5 2.5 0 0 0 0-5H18M4 22h16M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22M18 2H6v7a6 6 0 0 0 12 0V2Z" fill="#b45309" />
+        </svg>
+    ),
 }
 
 // ── Tab Configuration ───────────────────────────────────
 const TAB_CONFIG = {
-    info:      { label: 'Overview',  icon: Icons.info,      color: 'text-sky-600',     bg: 'bg-sky-50' },
-    standings: { label: 'Standings', icon: Icons.standings, color: 'text-amber-600',   bg: 'bg-amber-50' },
-    fixtures:  { label: 'Fixtures',  icon: Icons.fixtures,  color: 'text-emerald-600', bg: 'bg-emerald-50' },
-    bracket:   { label: 'Bracket',   icon: Icons.bracket,   color: 'text-violet-600',  bg: 'bg-violet-50' },
-    teams:     { label: 'Teams',     icon: Icons.teams,     color: 'text-indigo-600',  bg: 'bg-indigo-50' },
-    media:     { label: 'Media',     icon: Icons.camera,    color: 'text-pink-600',    bg: 'bg-pink-50' },
-    settings:  { label: 'Settings',  icon: Icons.settings,  color: 'text-slate-600',   bg: 'bg-slate-50' },
+    info: { label: 'Overview', icon: Icons.info, color: 'text-sky-600', bg: 'bg-sky-50' },
+    standings: { label: 'Standings', icon: Icons.standings, color: 'text-amber-600', bg: 'bg-amber-50' },
+    fixtures: { label: 'Fixtures', icon: Icons.fixtures, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+    bracket: { label: 'Bracket', icon: Icons.bracket, color: 'text-violet-600', bg: 'bg-violet-50' },
+    teams: { label: 'Teams', icon: Icons.teams, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+    media: { label: 'Media', icon: Icons.camera, color: 'text-pink-600', bg: 'bg-pink-50' },
+    settings: { label: 'Settings', icon: Icons.settings, color: 'text-slate-600', bg: 'bg-slate-50' },
 }
 
 export default function TournamentPage() {
@@ -300,20 +315,24 @@ export default function TournamentPage() {
         setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000)
     }
 
+    // ── Mobile Tab Tooltip ─────────────────────────────
+    const [pressedTab, setPressedTab] = useState(null)
+    const tabPressTimer = useRef(null)
+
     const isOrganizer = user && tournament && user.id === tournament.organizer_id
     const confirmedTeams = teams.filter(t => t.status === 'confirmed')
     const pendingTeams = teams.filter(t => t.status === 'pending')
 
     // ── Data Loading ────────────────────────────────────
-    async function loadData(tournamentId) {
-        if (!tournamentId) return
+    async function loadData(t) {
+        if (!t?.id) return
         try {
             const [s, f, tm, g] = await Promise.all([
-                api.get(`/api/tournaments/${tournamentId}/standings`),
-                api.get(`/api/tournaments/${tournamentId}/fixtures`),
-                api.get(`/api/tournaments/${tournamentId}/teams`),
-                tournament?.format === 'group_knockout'
-                    ? api.get(`/api/tournaments/${tournamentId}/groups`)
+                api.get(`/api/tournaments/${t.id}/standings`),
+                api.get(`/api/tournaments/${t.id}/fixtures`),
+                api.get(`/api/tournaments/${t.id}/teams`),
+                t.format === 'group_knockout'
+                    ? api.get(`/api/tournaments/${t.id}/groups`)
                     : Promise.resolve({ data: { groups: [] } })
             ])
             setStandings(s.data.standings || [])
@@ -349,7 +368,7 @@ export default function TournamentPage() {
                         penalties_enabled: t.penalties_enabled
                     })
                 }
-                await loadData(t.id)
+                await loadData(t)
             })
             .catch(err => { console.error('Load error:', err); setLoading(false) })
             .finally(() => setLoading(false))
@@ -360,6 +379,11 @@ export default function TournamentPage() {
         if (!tournament?.id) return
         const baseURL = api.defaults.baseURL || window.location.origin
         const wsURL = baseURL.replace(/^http/, 'ws') + `/api/tournaments/${tournament.id}/chat`
+        /* 
+           NOTE: The /chat WebSocket route needs to be registered in the backend.
+           Commenting out for deployment if backend logic isn't fully implemented to avoid console errors.
+        */
+        /*
         const socket = new WebSocket(wsURL)
         socket.onmessage = (event) => {
             const data = JSON.parse(event.data)
@@ -369,6 +393,7 @@ export default function TournamentPage() {
             }
         }
         return () => socket.close()
+        */
     }, [tournament?.id, isOrganizer])
 
     useEffect(() => {
@@ -405,25 +430,40 @@ export default function TournamentPage() {
         setGenerating(true)
         try {
             const res = await api.post(`/api/tournaments/${tournament.id}/generate`)
-            await loadData(tournament.id)
+            await loadData(tournament)
             addToast(`Generated ${res.data.count} matches!`)
         } catch (err) { alert(err.response?.data?.error || 'Failed to generate') }
         finally { setGenerating(false) }
     }
 
-    async function handleScore(matchId) {
+    async function handleAddManualRound(type) {
         if (!isOrganizer) return
-        const s = scores[matchId]
+        const currentRounds = [...new Set(fixtures.map(f => f.round_number))]
+        const nextRoundNum = currentRounds.length > 0 ? Math.max(...currentRounds) + 1 : 1
+
+        try {
+            await api.post(`/api/tournaments/${tournament.id}/manual-round`, {
+                match_type: type,
+                round_number: nextRoundNum
+            })
+            await loadData(tournament)
+            addToast(`Added ${type.replace('_', ' ')} round!`)
+        } catch (err) { alert('Failed to add round') }
+    }
+
+    async function handleScore(matchId, scoreData) {
+        if (!isOrganizer) return
+        const s = scoreData || scores[matchId]
         if (!s || s.home === '' || s.away === '') { alert('Enter both scores'); return }
         setSubmitting(matchId)
         try {
             const payload = { home_score: parseInt(s.home, 10), away_score: parseInt(s.away, 10) }
-            if (s.pHome !== undefined && s.pAway !== undefined) {
+            if (s.pHome !== undefined && s.pAway !== undefined && s.pHome !== '' && s.pAway !== '') {
                 payload.home_penalty_score = parseInt(s.pHome, 10)
                 payload.away_penalty_score = parseInt(s.pAway, 10)
             }
             await api.patch(`/api/tournaments/${tournament.id}/matches/${matchId}/score`, payload)
-            await loadData(tournament.id)
+            await loadData(tournament)
             setScores(prev => { const next = { ...prev }; delete next[matchId]; return next })
             addToast('Score saved!')
         } catch (err) { alert(err.response?.data?.error || 'Failed') }
@@ -434,7 +474,7 @@ export default function TournamentPage() {
         if (!isOrganizer || !confirm('Reset this match?')) return
         try {
             await api.patch(`/api/tournaments/${tournament.id}/matches/${matchId}/reset`)
-            await loadData(tournament.id)
+            await loadData(tournament)
             addToast('Match reset')
         } catch (err) { alert(err.response?.data?.error || 'Reset failed') }
     }
@@ -443,7 +483,7 @@ export default function TournamentPage() {
         if (!isOrganizer || !confirm('Remove this match permanently?')) return
         try {
             await api.delete(`/api/tournaments/${tournament.id}/matches/${matchId}`)
-            await loadData(tournament.id)
+            await loadData(tournament)
             addToast('Match removed')
         } catch (err) { alert(err.response?.data?.error || 'Remove failed') }
     }
@@ -495,7 +535,7 @@ export default function TournamentPage() {
             setNewTeamAvatarPreview(null)
             setShowAddTeam(false)
             setEditingTeam(null)
-            await loadData(tournament.id)
+            await loadData(tournament)
             addToast(editingTeam ? 'Team updated!' : 'Team added!')
         } catch (err) { alert(err.response?.data?.error || 'Failed') }
         finally { setAddingTeam(false) }
@@ -505,7 +545,7 @@ export default function TournamentPage() {
         if (!isOrganizer || !confirm('Remove this team from the tournament?')) return
         try {
             await api.delete(`/api/tournaments/${tournament.id}/teams/${teamId}`)
-            await loadData(tournament.id)
+            await loadData(tournament)
             addToast('Team removed')
         } catch (err) {
             alert(err.response?.data?.error || 'Failed to remove team')
@@ -516,7 +556,7 @@ export default function TournamentPage() {
         if (!isOrganizer) return
         try {
             await api.patch(`/api/tournaments/${tournament.id}/teams/${teamId}`, { action })
-            await loadData(tournament.id)
+            await loadData(tournament)
             addToast(action === 'approve' ? 'Approved!' : 'Rejected')
         } catch (err) { alert(err.response?.data?.error || 'Failed') }
     }
@@ -630,7 +670,7 @@ export default function TournamentPage() {
 
             {/* ── Banner ── */}
             {tournament.banner_url && (
-                <div className="w-full h-48 sm:h-56 md:h-72 relative overflow-hidden group">
+                <div className="w-full h-36 sm:h-44 md:h-56 relative overflow-hidden group">
                     <img src={tournament.banner_url} alt={tournament.name} className="w-full h-full object-cover" />
                     <div className="absolute inset-0 bg-gradient-to-t from-[#1a1612]/80 via-[#1a1612]/20 to-transparent" />
                     {isOrganizer && (
@@ -651,7 +691,7 @@ export default function TournamentPage() {
                     <div className="flex items-center justify-between gap-3">
                         <div className="flex items-center gap-3 min-w-0">
                             <button
-                                onClick={() => navigate('/dashboard')}
+                                onClick={() => navigate(-1)}
                                 className="flex-shrink-0 w-9 h-9 flex items-center justify-center rounded-xl text-[#6b6357] hover:text-[#1a1612] hover:bg-[#f5debe]/50 transition-colors"
                             >
                                 <Icons.arrowLeft className="w-5 h-5" />
@@ -703,8 +743,8 @@ export default function TournamentPage() {
                 <MatchActionModal
                     match={selectedMatch}
                     onClose={() => setSelectedMatch(null)}
-                    onScore={async (matchId) => {
-                        await handleScore(matchId)
+                    onScore={async (matchId, scoreData) => {
+                        await handleScore(matchId, scoreData)
                         setSelectedMatch(null)
                     }}
                     onReset={async (matchId) => {
@@ -716,7 +756,6 @@ export default function TournamentPage() {
                         setSelectedMatch(null)
                     }}
                     scores={scores}
-                    setScores={setScores}
                     submitting={submitting}
                 />
             )}
@@ -873,7 +912,7 @@ export default function TournamentPage() {
             )}
 
             {/* ── Tabs ── */}
-            <div className="bg-[#fefcf2]/80 backdrop-blur-sm border-b border-[#ede8de] sticky top-[env(safe-area-inset-top)] z-20">
+            <div className="bg-[#fefcf2]/80 backdrop-blur-sm border-b border-[#ede8de] sticky top-[64px] sm:top-[76px] z-20">
                 <div className="max-w-4xl mx-auto overflow-hidden">
                     <div className="flex overflow-x-auto no-scrollbar snap-x snap-mandatory px-2 sm:px-6 gap-1">
                         {availableTabs.map(t => {
@@ -886,6 +925,17 @@ export default function TournamentPage() {
                                 <button
                                     key={t}
                                     onClick={() => setTab(t)}
+                                    onTouchStart={() => {
+                                        tabPressTimer.current = setTimeout(() => setPressedTab(t), 500)
+                                    }}
+                                    onTouchEnd={() => {
+                                        clearTimeout(tabPressTimer.current)
+                                        setPressedTab(null)
+                                    }}
+                                    onTouchCancel={() => {
+                                        clearTimeout(tabPressTimer.current)
+                                        setPressedTab(null)
+                                    }}
                                     className={`group/tab relative snap-start flex-shrink-0 flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-1 sm:gap-2 py-3.5 sm:py-3.5 px-3 sm:px-4 transition-all duration-200 outline-none select-none touch-manipulation min-w-[64px] ${isActive
                                         ? 'text-[#dc574b]'
                                         : 'text-[#9b8e80] hover:text-[#1a1612]'
@@ -906,8 +956,8 @@ export default function TournamentPage() {
                                         {config.label}
                                     </span>
 
-                                    {/* Mobile Tooltip */}
-                                    <div className="sm:hidden absolute -top-10 left-1/2 -translate-x-1/2 px-2.5 py-1.5 bg-[#1a1612] text-white text-[10px] font-black uppercase tracking-widest rounded-lg opacity-0 group-hover/tab:opacity-100 group-active/tab:opacity-100 pointer-events-none transition-all duration-200 shadow-xl z-50 whitespace-nowrap">
+                                    {/* Mobile Tooltip (hover + long-press) */}
+                                    <div className={`sm:hidden absolute -top-10 left-1/2 -translate-x-1/2 px-2.5 py-1.5 bg-[#1a1612] text-white text-[10px] font-black uppercase tracking-widest rounded-lg pointer-events-none transition-all duration-200 shadow-xl z-50 whitespace-nowrap ${pressedTab === t ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-1 group-hover/tab:opacity-100 group-hover/tab:translate-y-0'}`}>
                                         {config.label}
                                         <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-[#1a1612] rotate-45" />
                                     </div>
@@ -945,6 +995,23 @@ export default function TournamentPage() {
                                 )
                             })}
                         </div>
+
+                        {/* Join Tournament CTA */}
+                        {tournament.status === 'registration' && (
+                            <div className="bg-[#dc574b] rounded-2xl p-6 sm:p-8 text-white shadow-lg shadow-[#dc574b]/20 flex flex-col sm:flex-row items-center justify-between gap-6 overflow-hidden relative group">
+                                <div className="absolute top-0 right-0 -translate-y-1/4 translate-x-1/4 opacity-10 group-hover:scale-110 transition-transform duration-700">
+                                    <Icons.trophy className="w-48 h-48" />
+                                </div>
+                                <div className="relative z-10 text-center sm:text-left">
+                                    <h3 className="text-xl font-black tracking-tight mb-1">Ready to compete?</h3>
+                                    <p className="text-white/80 text-sm font-medium">Registration is currently open. Secure your spot today!</p>
+                                </div>
+                                <button onClick={() => setShowRequestForm(true)}
+                                    className="relative z-10 px-8 py-3 bg-white text-[#dc574b] font-black text-sm uppercase tracking-widest rounded-xl hover:bg-[#fefcf2] transition-all active:scale-95 shadow-xl">
+                                    Register Team
+                                </button>
+                            </div>
+                        )}
 
                         <div className="bg-white/90 backdrop-blur-sm rounded-2xl border border-[#ede8de] overflow-hidden shadow-sm">
                             <div className="px-5 sm:px-6 py-4 border-b border-[#f0ebe3] flex items-center gap-2">
@@ -1067,7 +1134,7 @@ export default function TournamentPage() {
                                             <span className="text-xs text-[#9b8e80] font-medium">{group.fixtures?.length || 0} matches</span>
                                         </div>
                                         <div className="overflow-x-auto no-scrollbar">
-                                            <StandingsTable rows={group.standings} advanceCount={tournament.teams_advance_per_group || 2} />
+                                            <StandingsTable rows={group.standings} advanceCount={tournament.teams_advance_per_group} format={tournament.format} />
                                         </div>
                                     </div>
                                 ))}
@@ -1078,7 +1145,7 @@ export default function TournamentPage() {
                                     <EmptyState message="No standings yet" icon={Icons.standings} />
                                 ) : (
                                     <div className="overflow-x-auto no-scrollbar">
-                                        <StandingsTable rows={standingsRows} advanceCount={2} />
+                                        <StandingsTable rows={standingsRows} advanceCount={tournament.teams_advance_per_group} format={tournament.format} />
                                     </div>
                                 )}
                             </div>
@@ -1090,15 +1157,33 @@ export default function TournamentPage() {
                 {tab === 'fixtures' && (
                     <div className="space-y-5 sm:space-y-6">
                         {isOrganizer && (
-                            <div className="flex items-center justify-between">
+                            <div className="flex flex-wrap items-center justify-between gap-3 bg-[#fcfaf5] p-4 rounded-2xl border border-[#ede8de]">
                                 <p className="text-xs text-[#9b8e80] font-medium">
-                                    {isOrganizer ? 'Tap any match to manage scores' : ''}
+                                    Manage match lifecycle
                                 </p>
-                                <button onClick={handleGenerate} disabled={generating || confirmedTeams.length < 2}
-                                    className="px-4 py-2.5 text-xs font-bold text-[#6b6357] bg-[#f5debe]/50 border border-[#e8d9b4] rounded-xl hover:bg-[#f5debe] transition-colors disabled:opacity-40 tracking-wide uppercase flex items-center gap-2 shadow-sm">
-                                    <Icons.refresh className={`w-3.5 h-3.5 ${generating ? 'animate-spin' : ''}`} />
-                                    {generating ? 'Generating…' : fixtures.length > 0 ? 'Regenerate' : 'Generate Fixtures'}
-                                </button>
+                                <div className="flex flex-wrap gap-2">
+                                    <div className="relative group/menu">
+                                        <button className="px-4 py-2.5 text-[10px] font-black text-white bg-[#1a1612] rounded-xl hover:bg-black transition-all tracking-widest uppercase flex items-center gap-2 shadow-sm">
+                                            <Icons.plus className="w-3 h-3" /> Add Round
+                                        </button>
+                                        <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-[#ede8de] rounded-xl shadow-xl opacity-0 pointer-events-none group-hover/menu:opacity-100 group-hover/menu:pointer-events-auto transition-all z-50 overflow-hidden">
+                                            {[
+                                                { label: 'Quarter Final', type: 'quarter_final' },
+                                                { label: 'Semi Final', type: 'semi_final' },
+                                                { label: 'Grand Final', type: 'final' }
+                                            ].map(r => (
+                                                <button key={r.type} onClick={() => handleAddManualRound(r.type)} className="w-full text-left px-4 py-3 text-xs font-bold text-[#5c3d2e] hover:bg-[#fcfaf5] border-b border-[#f5f0e8] last:border-0 transition-colors uppercase tracking-wider">
+                                                    {r.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <button onClick={handleGenerate} disabled={generating || confirmedTeams.length < 2}
+                                        className="px-4 py-2.5 text-[10px] font-black text-[#7a6040] bg-[#f5debe]/60 border border-[#e8d9b4] rounded-xl hover:bg-[#f5debe] transition-all disabled:opacity-40 tracking-widest uppercase flex items-center gap-2">
+                                        <Icons.refresh className={`w-3 h-3 ${generating ? 'animate-spin' : ''}`} />
+                                        {fixtures.length > 0 ? 'Regenerate' : 'Generate'}
+                                    </button>
+                                </div>
                             </div>
                         )}
 
@@ -1200,7 +1285,7 @@ export default function TournamentPage() {
                 {/* MEDIA */}
                 {tab === 'media' && (
                     <div className="space-y-6">
-                        <MediaTab tournament={tournament} isOrganizer={isOrganizer} />
+                        <MediaTab tournament={tournament} isOrganizer={isOrganizer} addToast={addToast} />
                     </div>
                 )}
 
@@ -1562,8 +1647,10 @@ function EmptyState({ message, icon: Icon }) {
     )
 }
 
-function StandingsTable({ rows, advanceCount }) {
+function StandingsTable({ rows, advanceCount, format }) {
     const [showFull, setShowFull] = useState(false)
+    const isLeague = format === 'round_robin' || format === 'free_for_all'
+    const actualAdvanceCount = isLeague ? 0 : (advanceCount || 2)
 
     return (
         <div className="flex flex-col">
@@ -1574,39 +1661,42 @@ function StandingsTable({ rows, advanceCount }) {
             <div className="overflow-x-auto no-scrollbar">
                 <table className="w-full text-sm">
                     <thead>
-                        <tr className="bg-[#f5debe]/20 border-b border-[#ede8de]">
-                            <th className="py-3 px-3 text-[10px] font-bold text-[#9b8e80] uppercase tracking-[0.1em] text-center w-8">#</th>
-                            <th className="py-3 px-3 text-[10px] font-bold text-[#9b8e80] uppercase tracking-[0.1em] text-left">Team</th>
-                            <th className="py-3 px-3 text-[10px] font-bold text-[#9b8e80] uppercase tracking-[0.1em] text-center w-10">P</th>
-                            <th className={`py-3 px-3 text-[10px] font-bold text-[#9b8e80] uppercase tracking-[0.1em] text-center w-10 ${showFull ? 'table-cell' : 'hidden sm:table-cell'}`}>W</th>
-                            <th className={`py-3 px-3 text-[10px] font-bold text-[#9b8e80] uppercase tracking-[0.1em] text-center w-10 ${showFull ? 'table-cell' : 'hidden sm:table-cell'}`}>D</th>
-                            <th className={`py-3 px-3 text-[10px] font-bold text-[#9b8e80] uppercase tracking-[0.1em] text-center w-10 ${showFull ? 'table-cell' : 'hidden sm:table-cell'}`}>L</th>
-                            <th className={`py-3 px-3 text-[10px] font-bold text-[#9b8e80] uppercase tracking-[0.1em] text-center w-12 ${showFull ? 'table-cell' : 'hidden md:table-cell'}`}>GD</th>
-                            <th className={`py-3 px-3 text-[10px] font-bold text-[#9b8e80] uppercase tracking-[0.1em] text-center w-12 ${showFull ? 'table-cell' : 'hidden lg:table-cell'}`}>AG</th>
-                            <th className="py-3 px-3 text-[10px] font-bold text-[#9b8e80] uppercase tracking-[0.1em] text-center w-12">Pts</th>
+                        <tr className="bg-[#fcfaf5] border-b border-[#ede8de]">
+                            <th className="py-4 px-4 text-[10px] font-black text-[#9b8e80] uppercase tracking-[0.2em] text-center w-12">Pos</th>
+                            <th className="py-4 px-3 text-[10px] font-black text-[#9b8e80] uppercase tracking-[0.2em] text-left">Team</th>
+                            <th className="py-4 px-3 text-[10px] font-black text-[#9b8e80] uppercase tracking-[0.2em] text-center w-12">PL</th>
+                            <th className={`py-4 px-3 text-[10px] font-black text-[#9b8e80] uppercase tracking-[0.2em] text-center w-12 ${showFull ? 'table-cell' : 'hidden sm:table-cell'}`}>W</th>
+                            <th className={`py-4 px-3 text-[10px] font-black text-[#9b8e80] uppercase tracking-[0.2em] text-center w-12 ${showFull ? 'table-cell' : 'hidden sm:table-cell'}`}>D</th>
+                            <th className={`py-4 px-3 text-[10px] font-black text-[#9b8e80] uppercase tracking-[0.2em] text-center w-12 ${showFull ? 'table-cell' : 'hidden sm:table-cell'}`}>L</th>
+                            <th className={`py-4 px-3 text-[10px] font-black text-[#9b8e80] uppercase tracking-[0.2em] text-center w-14 ${showFull ? 'table-cell' : 'hidden md:table-cell'}`}>GD</th>
+                            <th className={`py-4 px-3 text-[10px] font-black text-[#9b8e80] uppercase tracking-[0.2em] text-center w-14 ${showFull ? 'table-cell' : 'hidden lg:table-cell'}`}>AG</th>
+                            <th className="py-4 px-4 text-[10px] font-black text-[#dc574b] uppercase tracking-[0.2em] text-center w-16 bg-[#dc574b]/5">Pts</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody className="divide-y divide-[#f5f0e8]">
                         {rows.map((team, i) => {
-                            const advances = i < advanceCount
+                            const advances = i < actualAdvanceCount
                             return (
                                 <tr key={team.id || i}
-                                    className={`border-b border-[#f5f0e8] last:border-0 transition-colors hover:bg-[#f5debe]/10 ${advances ? 'bg-emerald-50/30' : ''}`}>
-                                    <td className="py-3 px-3 text-center text-[#9b8e80] font-semibold text-xs">{i + 1}</td>
+                                    className={`group transition-colors hover:bg-[#fcfaf5] ${advances ? 'bg-emerald-50/20' : ''}`}>
+                                    <td className={`py-4 px-4 text-center text-xs font-bold tabular-nums ${advances ? 'text-emerald-600 border-l-4 border-emerald-500' : 'text-[#9b8e80] border-l-4 border-transparent'}`}>{i + 1}</td>
                                     <td className="py-3 px-3 font-semibold text-[#1a1612]">
                                         <div className="flex items-center gap-2">
-                                            <Avatar src={team.logo_url} name={team.name} size="w-5 h-5" text_size="text-[9px]" />
-                                            <span className="truncate max-w-[80px] sm:max-w-none">{team.name}</span>
-                                            {advances && <span className="text-[8px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-200/60 px-1 py-0.5 rounded-full uppercase tracking-wide flex-shrink-0 ml-1">adv</span>}
+                                            <Avatar src={team.logo_url} name={team.name} size="w-6 h-6" rounded="rounded-md" text_size="text-[10px]" />
+                                            <span className="truncate max-w-[120px] sm:max-w-none text-sm">{team.name}</span>
+                                            {advances && <span className="text-[7px] font-black text-emerald-600 bg-emerald-100/50 border border-emerald-200 px-1 py-0.5 rounded uppercase tracking-tighter flex-shrink-0 ml-1">QUALIFIED</span>}
+                                            {isLeague && i === 0 && <Icons.medalGold className="w-4 h-4 ml-1" />}
+                                            {isLeague && i === 1 && <Icons.medalSilver className="w-4 h-4 ml-1" />}
+                                            {isLeague && i === 2 && <Icons.medalBronze className="w-4 h-4 ml-1" />}
                                         </div>
                                     </td>
-                                    <td className="py-3 px-3 text-center text-[#6b6357] text-xs font-medium">{team.played || 0}</td>
-                                    <td className={`py-3 px-3 text-center text-[#6b6357] text-xs ${showFull ? 'table-cell' : 'hidden sm:table-cell'}`}>{team.won || 0}</td>
-                                    <td className={`py-3 px-3 text-center text-[#6b6357] text-xs ${showFull ? 'table-cell' : 'hidden sm:table-cell'}`}>{team.drawn || 0}</td>
-                                    <td className={`py-3 px-3 text-center text-[#6b6357] text-xs ${showFull ? 'table-cell' : 'hidden sm:table-cell'}`}>{team.lost || 0}</td>
-                                    <td className={`py-3 px-3 text-center text-[#6b6357] text-xs ${showFull ? 'table-cell' : 'hidden md:table-cell'}`}>{team.goal_difference || 0}</td>
-                                    <td className={`py-3 px-3 text-center text-[#9b8e80] text-xs italic ${showFull ? 'table-cell' : 'hidden lg:table-cell'}`}>{team.goals_away || 0}</td>
-                                    <td className="py-3 px-3 text-center font-bold text-[#1a1612] text-xs">{team.points || 0}</td>
+                                    <td className="py-4 px-3 text-center text-[#6b6357] text-xs font-bold tabular-nums">{team.played || 0}</td>
+                                    <td className={`py-4 px-3 text-center text-[#6b6357] text-xs tabular-nums ${showFull ? 'table-cell' : 'hidden sm:table-cell'}`}>{team.won || 0}</td>
+                                    <td className={`py-4 px-3 text-center text-[#6b6357] text-xs tabular-nums ${showFull ? 'table-cell' : 'hidden sm:table-cell'}`}>{team.drawn || 0}</td>
+                                    <td className={`py-4 px-3 text-center text-[#6b6357] text-xs tabular-nums ${showFull ? 'table-cell' : 'hidden sm:table-cell'}`}>{team.lost || 0}</td>
+                                    <td className={`py-4 px-3 text-center text-xs tabular-nums font-medium ${team.goal_difference > 0 ? 'text-emerald-600' : team.goal_difference < 0 ? 'text-red-500' : 'text-[#9b8e80]'} ${showFull ? 'table-cell' : 'hidden md:table-cell'}`}>{team.goal_difference > 0 ? `+${team.goal_difference}` : team.goal_difference || 0}</td>
+                                    <td className={`py-4 px-3 text-center text-[#9b8e80] text-xs tabular-nums ${showFull ? 'table-cell' : 'hidden lg:table-cell'}`}>{team.goals_away || 0}</td>
+                                    <td className="py-4 px-4 text-center font-black text-[#1a1612] text-sm tabular-nums bg-[#dc574b]/[0.02] group-hover:bg-[#dc574b]/5 transition-colors">{team.points || 0}</td>
                                 </tr>
                             )
                         })}
@@ -1617,116 +1707,199 @@ function StandingsTable({ rows, advanceCount }) {
     )
 }
 
-function MatchActionModal({ match, onClose, onScore, onReset, onRemove, scores, setScores, submitting }) {
+// ── Redesigned Match Action Modal ──────────────────────
+function MatchActionModal({ match, onClose, onScore, onReset, onRemove, scores, submitting }) {
     const [view, setView] = useState('menu')
+    const [localScores, setLocalScores] = useState({ home: '', away: '', pHome: '', pAway: '' })
+
+    useEffect(() => {
+        const existing = scores?.[match.id] || {}
+        setLocalScores({
+            home: existing.home ?? '',
+            away: existing.away ?? '',
+            pHome: existing.pHome ?? '',
+            pAway: existing.pAway ?? ''
+        })
+    }, [match.id, scores])
+
+    const updateLocal = (field, value) => {
+        setLocalScores(prev => ({ ...prev, [field]: value }))
+    }
+
+    const needsPenalties = localScores.home !== '' && localScores.away !== '' &&
+        Number(localScores.home) === Number(localScores.away)
+
+    const canSubmit = localScores.home !== '' && localScores.away !== '' &&
+        (!needsPenalties || (localScores.pHome !== '' && localScores.pAway !== ''))
+
+    const handleSubmit = () => {
+        onScore(match.id, { ...localScores })
+    }
 
     return (
-        <div className="fixed inset-0 bg-[#1a1612]/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
-            <div className="bg-[#fefcf2] rounded-3xl border border-[#ede8de] w-full max-w-sm overflow-hidden shadow-2xl">
+        <div className="fixed inset-0 bg-[#1a1612]/60 backdrop-blur-sm flex items-end sm:items-center justify-center z-[60] p-0 sm:p-4">
+            <div className="bg-[#fefcf2] rounded-t-3xl sm:rounded-3xl border border-[#ede8de] w-full max-w-sm overflow-hidden shadow-2xl animate-in slide-in-from-bottom-4 duration-300">
                 {/* Header */}
-                <div className="px-5 py-4 border-b border-[#f0ebe3] flex items-center justify-between">
-                    <span className="text-[10px] font-black text-[#dc574b] uppercase tracking-[0.2em] italic">Match Management</span>
-                    <button onClick={onClose} className="p-1 text-[#9b8e80] hover:text-[#1a1612] transition-colors">
+                <div className="px-6 py-4 border-b border-[#f0ebe3] flex items-center justify-between bg-white/50">
+                    <div>
+                        <span className="text-[10px] font-black text-[#dc574b] uppercase tracking-[0.2em]">Match Management</span>
+                        <p className="text-xs text-[#9b8e80] mt-0.5">
+                            {match.status === 'completed' ? 'Result recorded' : 'Enter match result'}
+                        </p>
+                    </div>
+                    <button onClick={onClose} className="p-2 text-[#9b8e80] hover:text-[#1a1612] hover:bg-[#f5debe]/30 rounded-xl transition-colors">
                         <Icons.x className="w-5 h-5" />
                     </button>
                 </div>
 
-                <div className="p-5">
-                    {/* Teams */}
-                    <div className="flex items-center justify-between gap-4 mb-8 bg-white p-4 rounded-2xl border border-[#ede8de]">
+                <div className="p-6 space-y-6">
+                    {/* Teams Display */}
+                    <div className="flex items-center justify-between gap-4">
                         <div className="flex-1 flex flex-col items-center gap-2">
-                            <Avatar src={match.home_team_logo} name={match.home_team_name} size="w-12 h-12" />
-                            <span className="text-[10px] font-black text-[#1a1612] uppercase tracking-wider text-center line-clamp-1">{match.home_team_name || 'TBD'}</span>
+                            <Avatar src={match.home_team_logo} name={match.home_team_name} size="w-14 h-14" />
+                            <span className="text-[10px] font-bold text-[#1a1612] uppercase tracking-wider text-center line-clamp-2 leading-tight">
+                                {match.home_team_name || 'TBD'}
+                            </span>
                         </div>
-                        
-                        <div className="px-4 py-2 bg-[#f5debe]/30 rounded-xl border border-[#e8d9b4] flex items-center justify-center min-w-[80px]">
-                            {match.status === 'completed' ? (
-                                <span className="text-lg font-black text-[#1a1612] tabular-nums italic">
-                                    {match.home_score} – {match.away_score}
-                                </span>
-                            ) : (
-                                <span className="text-sm font-black text-[#c8bfb0] italic tracking-tighter">VS</span>
-                            )}
+
+                        <div className="px-4 py-2 bg-[#f5debe]/30 rounded-2xl border border-[#e8d9b4]">
+                            <span className="text-lg font-black text-[#c8bfb0] italic tracking-tighter">VS</span>
                         </div>
 
                         <div className="flex-1 flex flex-col items-center gap-2">
-                            <Avatar src={match.away_team_logo} name={match.away_team_name} size="w-12 h-12" />
-                            <span className="text-[10px] font-black text-[#1a1612] uppercase tracking-wider text-center line-clamp-1">{match.away_team_name || 'TBD'}</span>
+                            <Avatar src={match.away_team_logo} name={match.away_team_name} size="w-14 h-14" />
+                            <span className="text-[10px] font-bold text-[#1a1612] uppercase tracking-wider text-center line-clamp-2 leading-tight">
+                                {match.away_team_name || 'TBD'}
+                            </span>
                         </div>
                     </div>
 
                     {view === 'menu' ? (
                         <div className="space-y-2.5">
                             <button onClick={() => setView('score')}
-                                className="w-full flex items-center gap-4 p-4 bg-white border border-[#e8d9b4] rounded-2xl hover:border-[#dc574b] hover:shadow-lg hover:shadow-[#dc574b]/5 transition-all group">
-                                <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:bg-[#dc574b] group-hover:text-white transition-colors">
-                                    <Icons.plus className="w-4 h-4" />
+                                className="w-full flex items-center gap-4 p-4 bg-white border-2 border-[#e8d9b4] rounded-2xl hover:border-[#dc574b] hover:shadow-lg hover:shadow-[#dc574b]/5 transition-all group active:scale-[0.98]">
+                                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:bg-[#dc574b] group-hover:text-white transition-colors">
+                                    <Icons.target className="w-5 h-5" />
                                 </div>
                                 <div className="text-left">
                                     <p className="text-sm font-bold text-[#1a1612]">Set Result</p>
                                     <p className="text-[10px] text-[#9b8e80] uppercase tracking-wider font-medium">Record final scores</p>
                                 </div>
+                                <Icons.chevronRight className="w-4 h-4 text-[#c8bfb0] ml-auto group-hover:text-[#dc574b] transition-colors" />
                             </button>
 
                             {match.status === 'completed' && (
                                 <button onClick={() => onReset(match.id)}
-                                    className="w-full flex items-center gap-4 p-4 bg-white border border-[#e8d9b4] rounded-2xl hover:bg-amber-50 hover:border-amber-200 transition-all">
-                                    <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
-                                        <Icons.refresh className="w-4 h-4" />
+                                    className="w-full flex items-center gap-4 p-4 bg-white border-2 border-[#e8d9b4] rounded-2xl hover:border-amber-300 hover:bg-amber-50/30 transition-all group active:scale-[0.98]">
+                                    <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+                                        <Icons.refresh className="w-5 h-5" />
                                     </div>
                                     <div className="text-left">
-                                        <p className="text-sm font-bold text-[#1a1612]">Restore Result</p>
+                                        <p className="text-sm font-bold text-[#1a1612]">Reset Match</p>
                                         <p className="text-[10px] text-[#9b8e80] uppercase tracking-wider font-medium">Revert to scheduled</p>
                                     </div>
                                 </button>
                             )}
 
                             <button onClick={() => onRemove(match.id)}
-                                className="w-full flex items-center gap-3 p-3.5 bg-white border border-[#e8d9b4] rounded-2xl hover:bg-red-50 hover:border-red-200 transition-all">
-                                <div className="w-8 h-8 rounded-lg bg-red-50 text-red-600 flex items-center justify-center">
-                                    <Icons.trash className="w-4 h-4" />
+                                className="w-full flex items-center gap-4 p-4 bg-white border-2 border-[#e8d9b4] rounded-2xl hover:border-red-200 hover:bg-red-50/30 transition-all group active:scale-[0.98]">
+                                <div className="w-10 h-10 rounded-xl bg-red-50 text-red-500 flex items-center justify-center">
+                                    <Icons.trash className="w-5 h-5" />
                                 </div>
                                 <div className="text-left">
                                     <p className="text-sm font-bold text-[#1a1612]">Remove Match</p>
-                                    <p className="text-[10px] text-[#9b8e80]">Delete fixture permanently</p>
+                                    <p className="text-[10px] text-[#9b8e80] uppercase tracking-wider font-medium">Delete fixture permanently</p>
                                 </div>
                             </button>
                         </div>
                     ) : (
-                        <div className="space-y-5">
-                            <div className="flex items-center gap-3">
-                                <input type="number" placeholder="0" value={scores[match.id]?.home ?? ''}
-                                    onChange={e => setScores(p => ({ ...p, [match.id]: { ...p[match.id], home: e.target.value } }))}
-                                    className="flex-1 px-4 py-4 bg-white border-2 border-[#e8d9b4] rounded-2xl text-center font-black text-3xl text-[#1a1612] focus:outline-none focus:border-[#dc574b] focus:ring-4 focus:ring-[#dc574b]/5 transition-all" autoFocus />
-                                <span className="text-[#c8bfb0] font-black text-3xl italic mx-2">/</span>
-                                <input type="number" placeholder="0" value={scores[match.id]?.away ?? ''}
-                                    onChange={e => setScores(p => ({ ...p, [match.id]: { ...p[match.id], away: e.target.value } }))}
-                                    className="flex-1 px-4 py-4 bg-white border-2 border-[#e8d9b4] rounded-2xl text-center font-black text-3xl text-[#1a1612] focus:outline-none focus:border-[#dc574b] focus:ring-4 focus:ring-[#dc574b]/5 transition-all" />
+                        <div className="space-y-5 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                            {/* Score Inputs */}
+                            <div>
+                                <p className="text-[10px] font-black text-[#9b8e80] uppercase tracking-[0.15em] mb-3 text-center">Full Time Score</p>
+                                <div className="flex items-center gap-3">
+                                    <div className="flex-1">
+                                        <label className="block text-[9px] font-bold text-[#9b8e80] uppercase tracking-wider text-center mb-1.5">Home</label>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            placeholder="0"
+                                            value={localScores.home}
+                                            onChange={e => updateLocal('home', e.target.value)}
+                                            className="w-full px-4 py-4 bg-white border-2 border-[#e8d9b4] rounded-2xl text-center font-black text-3xl text-[#1a1612] focus:outline-none focus:border-[#dc574b] focus:ring-4 focus:ring-[#dc574b]/5 transition-all"
+                                            autoFocus
+                                        />
+                                    </div>
+                                    <span className="text-[#c8bfb0] font-black text-2xl italic self-end pb-4">:</span>
+                                    <div className="flex-1">
+                                        <label className="block text-[9px] font-bold text-[#9b8e80] uppercase tracking-wider text-center mb-1.5">Away</label>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            placeholder="0"
+                                            value={localScores.away}
+                                            onChange={e => updateLocal('away', e.target.value)}
+                                            className="w-full px-4 py-4 bg-white border-2 border-[#e8d9b4] rounded-2xl text-center font-black text-3xl text-[#1a1612] focus:outline-none focus:border-[#dc574b] focus:ring-4 focus:ring-[#dc574b]/5 transition-all"
+                                        />
+                                    </div>
+                                </div>
                             </div>
 
-                            {scores[match.id]?.home === scores[match.id]?.away &&
-                                scores[match.id]?.home !== '' && scores[match.id]?.home !== undefined && (
-                                <div className="p-5 bg-amber-50/80 rounded-[2rem] border border-amber-100 animate-in zoom-in-95">
-                                    <p className="text-[10px] font-black text-amber-600 uppercase tracking-[0.2em] text-center mb-4 italic">Penalty Shootout</p>
-                                    <div className="flex items-center gap-4">
-                                        <input type="number" placeholder="P" value={scores[match.id]?.pHome ?? ''}
-                                            onChange={e => setScores(p => ({ ...p, [match.id]: { ...p[match.id], pHome: e.target.value } }))}
-                                            className="flex-1 px-3 py-3 bg-white border border-amber-200 rounded-xl text-center font-black text-xl text-amber-700" />
-                                        <span className="text-amber-300 font-black text-lg italic">VS</span>
-                                        <input type="number" placeholder="P" value={scores[match.id]?.pAway ?? ''}
-                                            onChange={e => setScores(p => ({ ...p, [match.id]: { ...p[match.id], pAway: e.target.value } }))}
-                                            className="flex-1 px-3 py-3 bg-white border border-amber-200 rounded-xl text-center font-black text-xl text-amber-700" />
+                            {/* Penalties */}
+                            {needsPenalties && (
+                                <div className="p-5 bg-amber-50/80 rounded-2xl border-2 border-amber-200 animate-in zoom-in-95 duration-300">
+                                    <div className="flex items-center gap-2 mb-4 justify-center">
+                                        <Icons.target className="w-4 h-4 text-amber-600" />
+                                        <p className="text-[10px] font-black text-amber-700 uppercase tracking-[0.15em]">Penalty Shootout Required</p>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <div className="flex-1">
+                                            <label className="block text-[9px] font-bold text-amber-600 uppercase tracking-wider text-center mb-1.5">Home Penalties</label>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                placeholder="0"
+                                                value={localScores.pHome}
+                                                onChange={e => updateLocal('pHome', e.target.value)}
+                                                className="w-full px-3 py-3 bg-white border-2 border-amber-200 rounded-xl text-center font-black text-2xl text-amber-700 focus:outline-none focus:border-amber-400 transition-all"
+                                            />
+                                        </div>
+                                        <span className="text-amber-300 font-black text-xl italic self-end pb-3">:</span>
+                                        <div className="flex-1">
+                                            <label className="block text-[9px] font-bold text-amber-600 uppercase tracking-wider text-center mb-1.5">Away Penalties</label>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                placeholder="0"
+                                                value={localScores.pAway}
+                                                onChange={e => updateLocal('pAway', e.target.value)}
+                                                className="w-full px-3 py-3 bg-white border-2 border-amber-200 rounded-xl text-center font-black text-2xl text-amber-700 focus:outline-none focus:border-amber-400 transition-all"
+                                            />
+                                        </div>
                                     </div>
                                 </div>
                             )}
 
-                            <div className="flex flex-col gap-2 pt-2">
-                                <button onClick={() => onScore(match.id)} disabled={submitting === match.id}
-                                    className="w-full py-3.5 bg-[#dc574b] text-white font-black text-xs uppercase tracking-widest rounded-2xl shadow-xl shadow-[#dc574b]/20 hover:bg-[#c44a3f] active:scale-95 transition-all disabled:opacity-40">
-                                    {submitting === match.id ? 'Saving…' : 'Submit Final Score'}
+                            <div className="flex flex-col gap-2.5 pt-2">
+                                <button
+                                    onClick={handleSubmit}
+                                    disabled={!canSubmit || submitting === match.id}
+                                    className="w-full py-3.5 bg-[#dc574b] text-white font-black text-xs uppercase tracking-widest rounded-2xl shadow-lg shadow-[#dc574b]/20 hover:bg-[#c44a3f] active:scale-[0.98] transition-all disabled:opacity-40 disabled:active:scale-100"
+                                >
+                                    {submitting === match.id ? (
+                                        <span className="flex items-center justify-center gap-2">
+                                            <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                            Saving…
+                                        </span>
+                                    ) : (
+                                        'Submit Final Score'
+                                    )}
                                 </button>
-                                <button onClick={() => setView('menu')} className="text-[10px] font-black text-[#9b8e80] uppercase tracking-widest py-3 italic">
-                                    ← Back
+                                <button
+                                    onClick={() => setView('menu')}
+                                    className="w-full py-3 text-[10px] font-black text-[#9b8e80] uppercase tracking-widest hover:text-[#1a1612] transition-colors"
+                                >
+                                    ← Back to Options
                                 </button>
                             </div>
                         </div>
@@ -1737,34 +1910,174 @@ function MatchActionModal({ match, onClose, onScore, onReset, onRemove, scores, 
     )
 }
 
-function MediaTab({ tournament, isOrganizer }) {
-    // Placeholder for actual media logic
+// ── Functional Media Tab ─────────────────────────────
+function MediaTab({ tournament, isOrganizer, addToast }) {
+    const [media, setMedia] = useState([])
+    const [loading, setLoading] = useState(true)
+    const [uploading, setUploading] = useState(false)
+    const [previewImage, setPreviewImage] = useState(null)
+    const fileInputRef = useRef(null)
+
+    useEffect(() => {
+        if (!tournament?.id) return
+        loadMedia()
+    }, [tournament?.id])
+
+    async function loadMedia() {
+        try {
+            setLoading(true)
+            const res = await api.get(`/api/tournaments/${tournament.id}/media`)
+            setMedia(res.data.media || [])
+        } catch (err) {
+            console.error('Media load error:', err)
+            setMedia([])
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    async function handleUpload(e) {
+        const files = e.target.files
+        if (!files?.length) return
+
+        setUploading(true)
+        try {
+            const formData = new FormData()
+            for (let i = 0; i < files.length; i++) {
+                formData.append('files', files[i])
+            }
+            await api.post(`/api/tournaments/${tournament.id}/media`, formData, {
+                headers: { 'Content-Type': undefined }
+            })
+            await loadMedia()
+            if (addToast) addToast('Photos uploaded!')
+        } catch (err) {
+            alert(err.response?.data?.error || 'Upload failed')
+        } finally {
+            setUploading(false)
+            if (fileInputRef.current) fileInputRef.current.value = ''
+        }
+    }
+
+    async function handleDelete(mediaId) {
+        if (!confirm('Delete this photo?')) return
+        try {
+            await api.delete(`/api/tournaments/${tournament.id}/media/${mediaId}`)
+            setMedia(prev => prev.filter(m => m.id !== mediaId))
+            if (addToast) addToast('Photo deleted')
+        } catch (err) {
+            alert('Failed to delete')
+        }
+    }
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center py-20">
+                <div className="w-8 h-8 rounded-full border-2 border-[#dc574b]/30 border-t-[#dc574b] animate-spin" />
+            </div>
+        )
+    }
+
     return (
         <div className="space-y-6">
-            <div className="bg-white/90 backdrop-blur-sm rounded-3xl border border-[#ede8de] p-8 sm:p-12 text-center shadow-sm">
-                <div className="w-20 h-20 bg-pink-50 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                    <Icons.camera className="w-10 h-10 text-pink-500" />
-                </div>
-                <h3 className="text-xl font-black text-[#1a1612] uppercase tracking-tighter italic">Tournament Gallery</h3>
-                <p className="text-sm text-[#9b8e80] mt-2 max-w-sm mx-auto font-medium">
-                    Relive the moments. Photos and videos of the tournament will appear here once uploaded.
-                </p>
-                
-                {isOrganizer && (
-                    <div className="mt-8">
-                        <button className="px-6 py-3 bg-[#1a1612] text-white text-xs font-black uppercase tracking-[0.2em] rounded-2xl hover:bg-[#2d2520] transition-all shadow-lg active:scale-95 flex items-center gap-3 mx-auto italic">
-                            <Icons.plus className="w-4 h-4" /> Upload Highlights
+            {isOrganizer && (
+                <div className="bg-white/90 backdrop-blur-sm rounded-2xl border border-[#ede8de] p-5 shadow-sm">
+                    <div className="flex items-center justify-between mb-4">
+                        <div>
+                            <h3 className="font-bold text-[#1a1612] text-sm flex items-center gap-2">
+                                <Icons.camera className="w-4 h-4 text-[#dc574b]" /> Upload Photos
+                            </h3>
+                            <p className="text-xs text-[#9b8e80] mt-1">Share tournament highlights with participants</p>
+                        </div>
+                        <button
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={uploading}
+                            className="px-4 py-2.5 bg-[#1a1612] text-white text-xs font-bold rounded-xl hover:bg-[#2d2520] transition-colors shadow-sm flex items-center gap-2 disabled:opacity-40"
+                        >
+                            <Icons.plus className="w-3.5 h-3.5" />
+                            {uploading ? 'Uploading…' : 'Add Photos'}
                         </button>
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            className="hidden"
+                            onChange={handleUpload}
+                        />
                     </div>
-                )}
-            </div>
+                    {uploading && (
+                        <div className="w-full h-1.5 bg-[#f5debe]/50 rounded-full overflow-hidden">
+                            <div className="h-full bg-[#dc574b] rounded-full animate-pulse w-2/3" />
+                        </div>
+                    )}
+                </div>
+            )}
 
-            {/* Grid display if media exists (placeholder) */}
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                {[1, 2, 3].map(i => (
-                    <div key={i} className="aspect-square bg-white/40 border border-dashed border-[#ede8de] rounded-2xl animate-pulse" />
-                ))}
-            </div>
+            {media.length === 0 ? (
+                <EmptyState
+                    message="No photos uploaded yet. Tournament memories will appear here."
+                    icon={Icons.camera}
+                />
+            ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                    {media.map((item, i) => (
+                        <div
+                            key={item.id || i}
+                            className="group relative aspect-square bg-white rounded-2xl border border-[#ede8de] overflow-hidden cursor-pointer shadow-sm hover:shadow-md transition-all"
+                            onClick={() => setPreviewImage(item)}
+                        >
+                            <img
+                                src={item.url || item.image_url}
+                                alt={item.caption || 'Tournament photo'}
+                                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                                loading="lazy"
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                            {isOrganizer && (
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); handleDelete(item.id) }}
+                                    className="absolute top-2 right-2 p-1.5 bg-red-500/90 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-200 hover:bg-red-600"
+                                    title="Delete"
+                                >
+                                    <Icons.trash className="w-3 h-3" />
+                                </button>
+                            )}
+                            {item.caption && (
+                                <div className="absolute bottom-0 left-0 right-0 p-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                                    <p className="text-white text-xs font-medium line-clamp-2">{item.caption}</p>
+                                </div>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {/* Lightbox */}
+            {previewImage && (
+                <div
+                    className="fixed inset-0 bg-[#1a1612]/90 backdrop-blur-md z-[70] flex items-center justify-center p-4"
+                    onClick={() => setPreviewImage(null)}
+                >
+                    <button
+                        onClick={() => setPreviewImage(null)}
+                        className="absolute top-4 right-4 p-2 bg-white/10 text-white rounded-full hover:bg-white/20 transition-colors"
+                    >
+                        <Icons.x className="w-5 h-5" />
+                    </button>
+                    <img
+                        src={previewImage.url || previewImage.image_url}
+                        alt={previewImage.caption || 'Preview'}
+                        className="max-w-full max-h-[85vh] rounded-2xl shadow-2xl object-contain"
+                        onClick={(e) => e.stopPropagation()}
+                    />
+                    {previewImage.caption && (
+                        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-white/10 backdrop-blur-md text-white px-4 py-2 rounded-full text-sm font-medium">
+                            {previewImage.caption}
+                        </div>
+                    )}
+                </div>
+            )}
         </div>
     )
 }
@@ -1777,11 +2090,10 @@ function MatchCard({ match, isOrganizer, showWinner = false, onClick }) {
     return (
         <div
             onClick={onClick}
-            className={`bg-white/90 backdrop-blur-sm rounded-xl border transition-all duration-200 p-3.5 sm:p-4 shadow-sm ${
-                isOrganizer
-                    ? 'cursor-pointer hover:border-[#dc574b] hover:shadow-md active:scale-[0.99]'
-                    : 'border-[#ede8de]'
-            }`}>
+            className={`bg-white/90 backdrop-blur-sm rounded-xl border transition-all duration-200 p-3.5 sm:p-4 shadow-sm ${isOrganizer
+                ? 'cursor-pointer hover:border-[#dc574b] hover:shadow-md active:scale-[0.99]'
+                : 'border-[#ede8de]'
+                }`}>
             <div className="flex items-center gap-2 sm:gap-3">
                 <span className={`font-semibold text-sm flex-1 flex items-center gap-2 min-w-0 ${homeWon ? 'text-[#dc574b]' : 'text-[#1a1612]'}`}>
                     <Avatar src={match.home_team_logo} name={match.home_team_name} size="w-5 h-5" text_size="text-[9px]" />
@@ -1811,49 +2123,72 @@ function MatchCard({ match, isOrganizer, showWinner = false, onClick }) {
 
 // ── Bracket Sub-components ────────────────────────────
 
-function BracketMatchCard({ match, isFinal = false }) {
-    const homeWon = match.status === 'completed' && match.winner_team_id === match.home_team_id
-    const awayWon = match.status === 'completed' && match.winner_team_id === match.away_team_id
+function TeamRow({ team, score, isFinal, match, side }) {
+    const isWinner = match.status === 'completed' && match.winner_team_id === team.id
+    const isLoser = match.status === 'completed' && match.winner_team_id && match.winner_team_id !== team.id
 
     return (
-        <div className={`bg-white rounded-2xl border-2 overflow-hidden transition-all ${isFinal ? 'border-amber-300 shadow-lg' : 'border-[#ede8de] shadow-sm'}`}>
+        <div className={`flex items-center justify-between transition-opacity ${team.isTbd ? 'opacity-40' : 'opacity-100'} ${isWinner ? 'text-[#dc574b]' : isLoser ? 'text-[#9b8e80]' : 'text-[#1a1612]'}`}>
+            <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                <div className="relative flex-shrink-0">
+                    {team.logo ? (
+                        <Avatar src={team.logo} name={team.name} size={isFinal ? "w-8 h-8" : "w-6 h-6"} text_size="text-[9px]" />
+                    ) : (
+                        <div className={`${isFinal ? "w-8 h-8" : "w-6 h-6"} rounded-full bg-[#f5debe]/50 border border-[#e8d9b4] flex items-center justify-center flex-shrink-0`}>
+                            <span className="text-[9px] font-bold text-[#9b8e80]">?</span>
+                        </div>
+                    )}
+                    {isWinner && (
+                        <div className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-500 rounded-full border-2 border-white shadow-sm flex items-center justify-center">
+                            <Icons.check className="w-2 h-2 text-white" />
+                        </div>
+                    )}
+                </div>
+                <div className="min-w-0">
+                    <span className={`font-bold uppercase tracking-tight truncate block ${isFinal ? 'text-sm' : 'text-[11px]'}`}>
+                        {team.name}
+                    </span>
+                    {team.source && (
+                        <span className="text-[9px] text-[#9b8e80] font-medium truncate block">{team.source}</span>
+                    )}
+                </div>
+            </div>
+            <span className={`font-black tabular-nums italic flex-shrink-0 ml-3 ${isFinal ? 'text-lg' : 'text-sm'} ${isLoser ? 'text-[#c8bfb0]' : ''}`}>
+                {score}
+            </span>
+        </div>
+    )
+}
+
+function BracketMatchCard({ match, isFinal = false, homeTeam, awayTeam }) {
+    const isCompleted = match.status === 'completed'
+
+    return (
+        <div className={`bg-white rounded-2xl border-2 overflow-hidden transition-all hover:shadow-md ${isFinal ? 'border-amber-300 shadow-lg' : 'border-[#ede8de] shadow-sm'}`}>
             {isFinal && (
-                <div className="bg-amber-50 px-4 py-2 border-b border-amber-100 flex items-center justify-center gap-2">
+                <div className="bg-amber-50/80 px-4 py-2.5 border-b border-amber-100 flex items-center justify-center gap-2">
                     <Icons.trophy className="w-4 h-4 text-amber-500" />
-                    <span className="text-[10px] font-black text-amber-700 uppercase tracking-widest">Championship Match</span>
+                    <span className="text-[10px] font-black text-amber-700 uppercase tracking-[0.2em]">Championship Final</span>
                 </div>
             )}
             <div className="p-4 space-y-3">
-                {/* Home Team */}
-                <div className={`flex items-center justify-between ${homeWon ? 'text-[#dc574b]' : 'text-[#1a1612]'}`}>
-                    <div className="flex items-center gap-2.5 min-w-0">
-                        <Avatar src={match.home_team_logo} name={match.home_team_name} size={isFinal ? "w-8 h-8" : "w-6 h-6"} text_size="text-[9px]" />
-                        <span className={`font-bold truncate ${isFinal ? 'text-sm' : 'text-xs'}`}>
-                            {match.home_team_name || 'TBD'}
-                        </span>
-                        {homeWon && <Icons.check className="w-3.5 h-3.5 text-[#dc574b] flex-shrink-0" />}
-                    </div>
-                    <span className={`font-black tabular-nums ${isFinal ? 'text-lg' : 'text-sm'}`}>
-                        {match.status === 'completed' ? match.home_score : '-'}
-                    </span>
-                </div>
+                <TeamRow
+                    team={homeTeam}
+                    score={isCompleted ? match.home_score : '-'}
+                    isFinal={isFinal}
+                    match={match}
+                    side="home"
+                />
 
-                {/* Divider */}
-                <div className="h-px bg-[#f0ebe3]" />
+                <div className="h-px bg-gradient-to-r from-transparent via-[#f0ebe3] to-transparent" />
 
-                {/* Away Team */}
-                <div className={`flex items-center justify-between ${awayWon ? 'text-[#dc574b]' : 'text-[#1a1612]'}`}>
-                    <div className="flex items-center gap-2.5 min-w-0">
-                        <Avatar src={match.away_team_logo} name={match.away_team_name} size={isFinal ? "w-8 h-8" : "w-6 h-6"} text_size="text-[9px]" />
-                        <span className={`font-bold truncate ${isFinal ? 'text-sm' : 'text-xs'}`}>
-                            {match.away_team_name || 'TBD'}
-                        </span>
-                        {awayWon && <Icons.check className="w-3.5 h-3.5 text-[#dc574b] flex-shrink-0" />}
-                    </div>
-                    <span className={`font-black tabular-nums ${isFinal ? 'text-lg' : 'text-sm'}`}>
-                        {match.status === 'completed' ? match.away_score : '-'}
-                    </span>
-                </div>
+                <TeamRow
+                    team={awayTeam}
+                    score={isCompleted ? match.away_score : '-'}
+                    isFinal={isFinal}
+                    match={match}
+                    side="away"
+                />
             </div>
         </div>
     )
@@ -1873,32 +2208,105 @@ function BracketTab({ fixtures, tournament }) {
         )
     }
 
+    // Group by round and sort matches within each round
     const rounds = {}
     bracketFixtures.forEach(f => {
         if (!rounds[f.round_number]) rounds[f.round_number] = []
         rounds[f.round_number].push(f)
     })
 
-    const roundKeys = Object.keys(rounds).sort((a, b) => a - b)
+    Object.keys(rounds).forEach(r => {
+        rounds[r].sort((a, b) => {
+            const aNum = a.match_number ?? Infinity
+            const bNum = b.match_number ?? Infinity
+            if (aNum !== bNum) return aNum - bNum
+            return a.id - b.id
+        })
+    })
+
+    const roundKeys = Object.keys(rounds).sort((a, b) => Number(a) - Number(b))
     const totalRounds = roundKeys.length
 
+    // Build lookup: roundNum -> array of sorted matches
+    const roundMatches = {}
+    roundKeys.forEach(r => { roundMatches[r] = rounds[r] })
+
+    // Resolve team for a match slot by walking the tree
+    const resolveSlot = (match, side) => {
+        const name = side === 'home' ? match.home_team_name : match.away_team_name
+        const logo = side === 'home' ? match.home_team_logo : match.away_team_logo
+        const id = side === 'home' ? match.home_team_id : match.away_team_id
+
+        if (name) {
+            return { name, logo, id, isWinner: false, source: null, isTbd: false }
+        }
+
+        const roundIdx = roundKeys.indexOf(String(match.round_number))
+        if (roundIdx <= 0) {
+            return { name: 'TBD', logo: null, id: null, isWinner: false, source: null, isTbd: true }
+        }
+
+        const prevRound = roundKeys[roundIdx - 1]
+        const currentMatches = roundMatches[match.round_number]
+        const pos = currentMatches.findIndex(m => m.id === match.id)
+        if (pos === -1) {
+            return { name: 'TBD', logo: null, id: null, isWinner: false, source: null, isTbd: true }
+        }
+
+        const sourcePos = side === 'home' ? pos * 2 : pos * 2 + 1
+        const sourceMatch = roundMatches[prevRound]?.[sourcePos]
+
+        if (!sourceMatch) {
+            return { name: 'TBD', logo: null, id: null, isWinner: false, source: null, isTbd: true }
+        }
+
+        const sourceLabel = getFixtureLabel(sourceMatch) || `Match ${sourceMatch.match_number || sourcePos + 1}`
+
+        if (sourceMatch.status === 'completed' && sourceMatch.winner_team_id) {
+            const winnerIsHome = sourceMatch.winner_team_id === sourceMatch.home_team_id
+            const winnerName = winnerIsHome ? sourceMatch.home_team_name : sourceMatch.away_team_name
+            const winnerLogo = winnerIsHome ? sourceMatch.home_team_logo : sourceMatch.away_team_logo
+
+            if (winnerName) {
+                return {
+                    name: winnerName,
+                    logo: winnerLogo,
+                    id: sourceMatch.winner_team_id,
+                    isWinner: false,
+                    source: `Winner of ${sourceLabel}`,
+                    isTbd: false
+                }
+            }
+        }
+
+        return {
+            name: 'TBD',
+            logo: null,
+            id: null,
+            isWinner: false,
+            source: `Winner of ${sourceLabel}`,
+            isTbd: true
+        }
+    }
+
     const getRoundName = (roundNum) => {
-        const diff = totalRounds - roundNum
+        const idx = roundKeys.indexOf(String(roundNum))
+        const diff = totalRounds - 1 - idx
         if (diff === 0) return 'Final'
         if (diff === 1) return 'Semi Finals'
         if (diff === 2) return 'Quarter Finals'
-        if (roundNum === 1 && totalRounds >= 4) return `Round of ${Math.pow(2, totalRounds - 1)}`
+        if (idx === 0 && totalRounds >= 4) return `Round of ${Math.pow(2, totalRounds)}`
         return `Round ${roundNum}`
     }
 
     return (
-        <div className="space-y-8 max-w-lg mx-auto">
+        <div className="space-y-10 max-w-2xl mx-auto">
             {roundKeys.map((roundNum, idx) => {
-                const isFinal = idx === roundKeys.length - 1
+                const isFinal = idx === totalRounds - 1
                 return (
                     <div key={roundNum} className="relative">
                         {/* Round Header */}
-                        <div className="flex items-center gap-3 mb-4">
+                        <div className="flex items-center gap-3 mb-5">
                             <div className="h-px flex-1 bg-gradient-to-r from-transparent via-[#ede8de] to-transparent" />
                             <div className={`px-4 py-1.5 rounded-full ${isFinal ? 'bg-amber-100 border border-amber-200' : 'bg-[#f5debe]/40 border border-[#e8d9b4]'}`}>
                                 <span className={`text-[10px] font-black uppercase tracking-[0.15em] ${isFinal ? 'text-amber-700' : 'text-[#7a6040]'}`}>
@@ -1909,17 +2317,23 @@ function BracketTab({ fixtures, tournament }) {
                         </div>
 
                         <div className="space-y-3">
-                            {rounds[roundNum].map(match => (
-                                <BracketMatchCard key={match.id} match={match} isFinal={isFinal} roundNum={parseInt(roundNum)} />
+                            {roundMatches[roundNum].map(match => (
+                                <BracketMatchCard
+                                    key={match.id}
+                                    match={match}
+                                    isFinal={isFinal}
+                                    homeTeam={resolveSlot(match, 'home')}
+                                    awayTeam={resolveSlot(match, 'away')}
+                                />
                             ))}
                         </div>
 
                         {/* Connector to next round */}
-                        {idx < roundKeys.length - 1 && (
-                            <div className="flex justify-center mt-6">
+                        {idx < totalRounds - 1 && (
+                            <div className="flex justify-center mt-8">
                                 <div className="flex flex-col items-center">
-                                    <div className="w-0.5 h-6 bg-[#dc574b]/20" />
-                                    <div className="w-2 h-2 rotate-45 border-r-2 border-b-2 border-[#dc574b]/30 mt-1" />
+                                    <div className="w-0.5 h-8 bg-gradient-to-b from-[#dc574b]/20 to-[#dc574b]/5" />
+                                    <div className="w-3 h-3 rotate-45 border-r-2 border-b-2 border-[#dc574b]/20 mt-1" />
                                 </div>
                             </div>
                         )}
@@ -1928,4 +2342,4 @@ function BracketTab({ fixtures, tournament }) {
             })}
         </div>
     )
-}
+} 

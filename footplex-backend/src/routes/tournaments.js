@@ -350,8 +350,8 @@ export default async function tournamentRoutes(app) {
             const fixturesResult = await pool.query(
                 `SELECT m.*, ht.name as home_team_name, at.name as away_team_name
          FROM matches m
-         JOIN teams ht ON ht.id=m.home_team_id
-         JOIN teams at ON at.id=m.away_team_id
+         LEFT JOIN teams ht ON ht.id=m.home_team_id
+         LEFT JOIN teams at ON at.id=m.away_team_id
          WHERE m.tournament_id=$1 AND m.group_name=$2
          ORDER BY m.round_number, m.id`,
                 [tournament_id, groupName]
@@ -686,6 +686,39 @@ app.post('/:id/teams/request', async (request, reply) => {
   })
 })
 
+    // ── ADD MANUAL ROUND ──────────────────────────────
+    app.post('/:id/manual-round', { preHandler: authenticate }, async (request, reply) => {
+        const tournament_id = parseInt(request.params.id)
+        const { match_type, round_number } = request.body
+
+        const tCheck = await pool.query(
+            'SELECT * FROM tournaments WHERE id=$1 AND organizer_id=$2',
+            [tournament_id, request.user.id]
+        )
+        if (tCheck.rows.length === 0) return reply.status(403).send({ error: 'Not authorized' })
+
+        const matchCountMap = {
+            'quarter_final': 4,
+            'semi_final': 2,
+            'final': 1
+        }
+
+        const count = matchCountMap[match_type] || 1
+        const inserted = []
+
+        for (let i = 1; i <= count; i++) {
+            const r = await pool.query(
+                `INSERT INTO matches 
+                (tournament_id, round_number, status, match_type, match_number, is_placeholder)
+                VALUES ($1,$2,'scheduled',$3,$4,true) RETURNING *`,
+                [tournament_id, round_number, match_type, i]
+            )
+            inserted.push(r.rows[0])
+        }
+
+        return reply.send({ message: `Added ${match_type} round`, matches: inserted })
+    })
+
     // ── GET ONE TOURNAMENT BY SLUG — must be LAST ──────
     app.get('/:slug', async (request, reply) => {
         const result = await pool.query(
@@ -698,21 +731,19 @@ app.post('/:id/teams/request', async (request, reply) => {
         return reply.send({ tournament: result.rows[0] })
     })
 
+    // ── DELETE TOURNAMENT ─────────────────────────────
+    app.delete('/:id', { preHandler: authenticate }, async (request, reply) => {
+        const tournament_id = parseInt(request.params.id)
 
+        const check = await pool.query(
+            'SELECT * FROM tournaments WHERE id=$1 AND organizer_id=$2',
+            [tournament_id, request.user.id]
+        )
 
+        if (check.rows.length === 0) return reply.status(403).send({ error: 'Not authorized' })
+
+        await pool.query('DELETE FROM tournaments WHERE id=$1', [tournament_id])
+        return reply.send({ message: 'Tournament deleted' })
+    })
 
 }
-
-app.delete('/:id', { preHandler: authenticate }, async (request, reply) => {
-  const tournament_id = parseInt(request.params.id)
-
-  const check = await pool.query(
-    'SELECT * FROM tournaments WHERE id=$1 AND organizer_id=$2',
-    [tournament_id, request.user.id]
-  )
-
-  if (check.rows.length === 0) return reply.status(403).send({ error: 'Not authorized' })
-
-  await pool.query('DELETE FROM tournaments WHERE id=$1', [tournament_id])
-  return reply.send({ message: 'Tournament deleted' })
-})

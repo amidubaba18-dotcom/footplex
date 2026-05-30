@@ -41,6 +41,12 @@ const ArenaBackground = () => (
     </svg>
 )
 
+const ArrowLeftIcon = ({ className }) => (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="m15 18-6-6 6-6" />
+    </svg>
+)
+
 const TrophyIcon = ({ className }) => (
     <svg viewBox="0 0 24 24" fill="none" className={className} stroke="currentColor" strokeWidth="1.5">
         <path d="M12 2v4M8 6h8M8 6s-2 2-2 5 2 5 2 5M16 6s2 2 2 5-2 5-2 5M8 16s2 3 4 3 4-3 4-3M12 19v3" strokeLinecap="round" strokeLinejoin="round" />
@@ -107,7 +113,16 @@ export default function MyEvents() {
             <div className="relative bg-gradient-to-b from-[#f5debe]/25 to-[#fefcf2]">
                 <div className="max-w-6xl mx-auto px-4 pt-6 pb-3 relative">
                     <ArenaBackground />
-                    <div className="relative z-10">
+                    <div className="relative z-10 flex flex-col gap-4">
+                        <div className="flex items-center gap-3">
+                            <button
+                                onClick={() => navigate(-1)}
+                                className="lg:hidden flex-shrink-0 w-9 h-9 flex items-center justify-center rounded-xl text-[#6b6357] hover:text-[#1a1612] hover:bg-[#f5debe]/50 transition-colors bg-white/50 backdrop-blur-sm shadow-sm border border-[#e5b186]/30"
+                            >
+                                <ArrowLeftIcon className="w-5 h-5" />
+                            </button>
+                            <div className="w-10 h-0.5 bg-[#da513f] rounded-full" />
+                        </div>
                         <h1 className="text-2xl md:text-3xl font-black text-[#5c3d2e] tracking-tight leading-tight">
                             My <span className="text-[#da513f]">Tournaments</span>
                         </h1>

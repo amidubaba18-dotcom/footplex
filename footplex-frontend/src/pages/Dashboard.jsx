@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import api from '../lib/api'
-import TournamentCard from '../components/TournamentCard'
+import TournamentCard from '../Components/TournamentCard'
 
 
 const IconSearch = ({ className }) => (
