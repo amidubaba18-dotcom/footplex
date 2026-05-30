@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../lib/api'
+import Navigation from '../components/Navigation'
 
 
 const BRACKET_FORMATS = new Set([
@@ -210,7 +211,11 @@ export default function CreateTournament() {
             if (tournamentId && bannerFile) {
                 const formData = new FormData()
                 formData.append('file', bannerFile)
-                await api.post(`/api/tournaments/${tournamentId}/banner`, formData)
+                await api.post(`/api/tournaments/${tournamentId}/banner`, formData, {
+                    headers: {
+                        'Content-Type': undefined
+                    }
+                })
             }
             if (tournamentId) navigate(`/manage/${tournamentId}`)
         } catch (err) {
@@ -230,17 +235,7 @@ export default function CreateTournament() {
 
             {/* ─── Header ─── */}
             <nav className="sticky top-0 z-50 bg-[#fefcf2]/90 backdrop-blur-md border-b border-[#e5b186]/40">
-                <div className="max-w-xl mx-auto px-4 h-14 flex items-center justify-between">
-                    <button onClick={() => navigate('/dashboard')} className="flex items-center gap-1 text-[#957467] hover:text-[#da513f] transition-colors text-sm font-semibold">
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
-                        Back
-                    </button>
-                    <div className="flex items-center gap-2">
-                        <TrophyIcon className="w-5 h-5 text-[#da513f]" />
-                        <span className="font-bold text-[#5c3d2e] text-sm tracking-tight">New Tournament</span>
-                    </div>
-                    <div className="w-10" /> {/* spacer for centering */}
-                </div>
+                
             </nav>
 
             {/* ─── Hero (compact on mobile) ─── */}
@@ -248,10 +243,7 @@ export default function CreateTournament() {
                 <div className="max-w-xl mx-auto px-4 pt-6 pb-4 md:pt-10 md:pb-6 relative">
                     <StadiumHero />
                     <div className="relative z-10 text-center">
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/80 border border-[#e5b186]/50 text-[#da513f] text-[10px] font-bold uppercase tracking-wider shadow-sm mb-2">
-                            <span className="w-1.5 h-1.5 rounded-full bg-[#da513f]" />
-                            Create Competition
-                        </span>
+
                         <h1 className="text-2xl md:text-3xl font-black text-[#5c3d2e] tracking-tight leading-tight">
                             Build Your <span className="text-[#da513f]">Tournament</span>
                         </h1>

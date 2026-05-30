@@ -1,6 +1,7 @@
 // src/components/GroupsView.jsx
 import { useEffect, useState } from 'react';
 import api from '../lib/api';
+import Avatar from './Avatar';
 
 export default function GroupsView({ tournamentId }) {
     const [groups, setGroups] = useState([]);
@@ -41,7 +42,12 @@ export default function GroupsView({ tournamentId }) {
                             <tbody>
                                 {group.standings.map(team => (
                                     <tr key={team.id} className="border-b">
-                                        <td className="py-1">{team.name}</td>
+                                        <td className="py-1">
+                                            <div className="flex items-center gap-2">
+                                                <Avatar src={team.logo_url} name={team.name} size="w-5 h-5" text_size="text-[10px]" />
+                                                <span>{team.name}</span>
+                                            </div>
+                                        </td>
                                         <td className="text-center">{team.played}</td>
                                         <td className="text-center">{team.won}</td>
                                         <td className="text-center">{team.drawn}</td>

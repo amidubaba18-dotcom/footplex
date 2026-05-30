@@ -5,7 +5,6 @@ import cors from '@fastify/cors'
 import jwt from '@fastify/jwt'
 import bcrypt from 'bcrypt'
 import pool from './plugins/db.js'
-import websocket from '@fastify/websocket'
 import multipart from '@fastify/multipart'
 import { v2 as cloudinary } from 'cloudinary'
 import { MatchService } from './MatchService.js'
@@ -28,9 +27,6 @@ if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
     console.error('FATAL: JWT_SECRET must be at least 32 characters long.')
     process.exit(1)
 }
-
-// Track active chat connections per tournament
-const chatClients = new Map()
 
 // ─── SECURITY CONFIG ────────────────────────────────────────────────────────
 const BCRYPT_ROUNDS = 12
@@ -153,8 +149,6 @@ cloudinary.config({
     api_secret: process.env.CLOUDINARY_API_SECRET
 })
 
-await app.register(websocket)
-
 // ─── AUTHENTICATE HOOK ───────────────────────────────────────────────────────
 const authenticate = async (request, reply) => {
     try {
@@ -163,19 +157,6 @@ const authenticate = async (request, reply) => {
     } catch (err) {
         console.error('AUTHENTICATION ERROR:', err.message)
         reply.status(401).send({ error: 'Unauthorized' })
-    }
-}
-
-// ─── WEBSOCKET AUTH HELPER ──────────────────────────────────────────────────
-async function wsAuthenticate(req) {
-    try {
-        const token = req.query?.token || req.headers?.authorization?.replace('Bearer ', '')
-        if (!token) throw new Error('Missing token')
-        const decoded = await app.jwt.verify(token)
-        req.user = decoded
-        return decoded
-    } catch (err) {
-        throw new Error('WebSocket authentication failed')
     }
 }
 
@@ -540,7 +521,7 @@ app.post('/api/tournaments', { preHandler: authenticate, schema: tournamentSchem
 
 app.get('/api/tournaments/my', { preHandler: authenticate }, async request => {
     const res = await pool.query(
-        `SELECT t.*, u.full_name AS organizer_name
+        `SELECT t.*, t.banner_url, u.full_name AS organizer_name, u.avatar_url AS organizer_avatar
          FROM tournaments t
          JOIN users u ON u.id=t.organizer_id
          WHERE t.organizer_id=$1
@@ -552,7 +533,7 @@ app.get('/api/tournaments/my', { preHandler: authenticate }, async request => {
 
 app.get('/api/tournaments', async () => {
     const res = await pool.query(
-        `SELECT t.*, u.full_name AS organizer_name
+        `SELECT t.*, t.banner_url, u.full_name AS organizer_name, u.avatar_url AS organizer_avatar
          FROM tournaments t
          JOIN users u ON u.id=t.organizer_id
          WHERE t.status IN ('registration', 'active')
@@ -564,7 +545,7 @@ app.get('/api/tournaments', async () => {
 
 app.get('/api/tournaments/:slug', async (request, reply) => {
     const res = await pool.query(
-        `SELECT t.*, u.full_name AS organizer_name
+        `SELECT t.*, u.full_name AS organizer_name, u.avatar_url AS organizer_avatar
          FROM tournaments t
          JOIN users u ON u.id=t.organizer_id
          WHERE t.slug=$1`,
@@ -817,6 +798,49 @@ app.patch('/api/tournaments/:id/teams/:teamId', { preHandler: authenticate }, as
     return { team: result.rows[0] }
 })
 
+app.put('/api/tournaments/:id/teams/:teamId', { preHandler: authenticate }, async (request, reply) => {
+    const { name, contact_name, contact_email } = request.body
+    const tournamentId = parseInt(request.params.id, 10)
+    const teamId = parseInt(request.params.teamId, 10)
+
+    const tournament = await TournamentService.getForOwner(tournamentId, request.user.id)
+    if (!tournament) return reply.status(403).send({ error: 'Not authorized' })
+
+    const res = await pool.query(
+        `UPDATE teams SET name=$1, contact_name=$2, contact_email=$3
+         WHERE id=$4 AND tournament_id=$5 RETURNING *`,
+        [sanitize(name), sanitize(contact_name) || null, sanitize(contact_email) || null, teamId, tournamentId]
+    )
+    if (res.rows.length === 0) return reply.status(404).send({ error: 'Team not found' })
+    return { team: res.rows[0] }
+})
+
+app.delete('/api/tournaments/:id/teams/:teamId', { preHandler: authenticate }, async (request, reply) => {
+    const tournamentId = parseInt(request.params.id, 10)
+    const teamId = parseInt(request.params.teamId, 10)
+
+    const tournament = await TournamentService.getForOwner(tournamentId, request.user.id)
+    if (!tournament) return reply.status(403).send({ error: 'Not authorized' })
+
+    if (tournament.status === 'active' || tournament.status === 'completed') {
+        return reply.status(400).send({ error: 'Cannot remove teams once the tournament has started' })
+    }
+
+    await pool.query('DELETE FROM teams WHERE id=$1 AND tournament_id=$2', [teamId, tournamentId])
+    return { message: 'Team removed' }
+})
+
+app.delete('/api/tournaments/:id/matches/:matchId', { preHandler: authenticate }, async (request, reply) => {
+    const tournamentId = parseInt(request.params.id, 10)
+    const matchId = parseInt(request.params.matchId, 10)
+
+    const tournament = await TournamentService.getForOwner(tournamentId, request.user.id)
+    if (!tournament) return reply.status(403).send({ error: 'Not authorized' })
+
+    await pool.query('DELETE FROM matches WHERE id=$1 AND tournament_id=$2', [matchId, tournamentId])
+    return { message: 'Match removed' }
+})
+
 app.post('/api/tournaments/:id/generate', { preHandler: authenticate }, async (request, reply) => {
     const tournamentId = parseInt(request.params.id, 10)
     const tournament = await TournamentService.getForOwner(tournamentId, request.user.id)
@@ -907,7 +931,7 @@ app.get('/api/tournaments/:id/fixtures', async request => {
     const tournamentId = parseInt(request.params.id, 10)
 
     const result = await pool.query(
-        `SELECT m.*, ht.name AS home_team_name, at.name AS away_team_name
+        `SELECT m.*, ht.name AS home_team_name, ht.logo_url AS home_team_logo, at.name AS away_team_name, at.logo_url AS away_team_logo
          FROM matches m
          LEFT JOIN teams ht ON m.home_team_id=ht.id
          LEFT JOIN teams at ON m.away_team_id=at.id
@@ -1193,84 +1217,39 @@ app.post('/api/tournaments/:id/banner', { preHandler: authenticate }, async (req
     }
 })
 
+// ─── ASSET REDIRECTS: Fixes 406 errors for old/local data ───────────────────
+app.get('/api/tournaments/:id/banner', async (request, reply) => {
+    const res = await pool.query('SELECT banner_url FROM tournaments WHERE id=$1', [request.params.id])
+    const url = res.rows[0]?.banner_url
+    if (url && url.startsWith('http')) return reply.redirect(url)
+    return reply.status(404).send({ error: 'Banner not found' })
+})
+
+app.get('/api/tournaments/:tournamentId/teams/:teamId/logo', async (request, reply) => {
+    const res = await pool.query('SELECT logo_url FROM teams WHERE id=$1', [request.params.teamId])
+    const url = res.rows[0]?.logo_url
+    if (url && url.startsWith('http')) return reply.redirect(url)
+    return reply.status(404).send({ error: 'Logo not found' })
+})
+
 app.get('/api/tournaments/:id/standings', async request => {
     const tournamentId = parseInt(request.params.id, 10)
     const standings = await TournamentService.getStandings(tournamentId)
+    /** 
+     * SQL for TournamentService.getStandings update:
+     * SELECT t.id, t.name, t.logo_url, ... 
+     * Ensure 'logo_url' is included in your query inside TournamentService.js
+     */
     return { standings }
-})
-
-// ─── CHAT ROUTES: AUTHENTICATED ─────────────────────────────────────────────
-app.get('/api/tournaments/:id/messages', { preHandler: authenticate }, async request => {
-    const tournamentId = parseInt(request.params.id, 10)
-    const result = await pool.query(
-        `SELECT m.*, u.avatar_url
-         FROM messages m
-         LEFT JOIN users u ON u.id = m.user_id
-         WHERE m.tournament_id=$1 ORDER BY m.created_at DESC LIMIT 50`,
-        [tournamentId]
-    )
-    return { messages: result.rows }
-})
-
-app.post('/api/tournaments/:id/messages', { preHandler: authenticate }, async (request, reply) => {
-    const { content } = request.body
-    const tournamentId = parseInt(request.params.id, 10)
-    const user = request.user
-
-    const cleanContent = sanitize(content)
-    if (!cleanContent) {
-        return reply.status(400).send({ error: 'Message content required' })
-    }
-
-    const result = await pool.query(
-        'INSERT INTO messages (tournament_id, user_id, sender_name, content) VALUES ($1,$2,$3,$4) RETURNING *',
-        [tournamentId, user.id, sanitize(user.full_name || user.email), cleanContent]
-    )
-
-    const newMessage = {
-        ...result.rows[0],
-        avatar_url: user.avatar_url || null
-    }
-
-    const clients = chatClients.get(tournamentId)
-    if (clients) {
-        const payload = JSON.stringify({ type: 'new_message', message: newMessage })
-        clients.forEach(client => {
-            if (client.readyState === 1) client.send(payload)
-        })
-    }
-
-    return { message: newMessage }
-})
-
-// WebSocket endpoint for real-time chat — REQUIRES AUTH
-app.get('/api/tournaments/:id/chat', { websocket: true }, async (connection, req) => {
-    try {
-        await wsAuthenticate(req)
-    } catch (err) {
-        connection.socket.close(1008, 'Authentication required')
-        return
-    }
-
-    const tournamentId = parseInt(req.params.id, 10)
-
-    if (!chatClients.has(tournamentId)) {
-        chatClients.set(tournamentId, new Set())
-    }
-    chatClients.get(tournamentId).add(connection.socket)
-
-    connection.socket.on('close', () => {
-        const clients = chatClients.get(tournamentId)
-        if (clients) {
-            clients.delete(connection.socket)
-            if (clients.size === 0) chatClients.delete(tournamentId)
-        }
-    })
 })
 
 app.get('/api/tournaments/:id/groups', async request => {
     const tournamentId = parseInt(request.params.id, 10)
     const groups = await TournamentService.getGroupsData(tournamentId)
+    /** 
+     * SQL for TournamentService.getGroupsData update:
+     * Ensure the team sub-queries or joins include 'logo_url'
+     */
     return { groups }
 })
 

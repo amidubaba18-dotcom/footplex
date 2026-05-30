@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import api from '../lib/api'
+import TournamentCard from '../Components/TournamentCard'
 
 /* ─── Warm Sports Arena SVG Background ─── */
 const ArenaBackground = () => (
@@ -40,62 +41,11 @@ const ArenaBackground = () => (
     </svg>
 )
 
-/* ─── Card Background SVGs ─── */
-const CardStadiumBg = ({ type }) => {
-    const isEfootball = type === 'efootball'
-    return (
-        <svg viewBox="0 0 300 120" className="absolute inset-0 w-full h-full opacity-[0.08] pointer-events-none" preserveAspectRatio="xMidYMid slice">
-            <defs>
-                <linearGradient id={`myCardGrad-${type}`} x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={isEfootball ? "#5c3d2e" : "#da513f"} stopOpacity="0.15" />
-                    <stop offset="100%" stopColor="#fefcf2" stopOpacity="0" />
-                </linearGradient>
-            </defs>
-            <rect width="100%" height="100%" fill={`url(#myCardGrad-${type})`} />
-            <path d="M0 40 Q75 15 150 20 Q225 15 300 40 L300 120 L0 120 Z" fill="#da513f" opacity="0.06" />
-            <line x1="150" y1="50" x2="150" y2="110" stroke="#92cfc6" strokeWidth="1.5" opacity="0.2" strokeDasharray="4 3" />
-            <circle cx="150" cy="80" r="12" stroke="#92cfc6" strokeWidth="1" fill="none" opacity="0.15" />
-            <rect x="40" y="65" width="25" height="30" rx="2" stroke="#92cfc6" strokeWidth="0.8" fill="none" opacity="0.12" />
-            <rect x="235" y="65" width="25" height="30" rx="2" stroke="#92cfc6" strokeWidth="0.8" fill="none" opacity="0.12" />
-            <circle cx="150" cy="80" r="3" fill="#da513f" opacity="0.3" />
-            <circle cx="100" cy="75" r="2" fill="#da513f" opacity="0.2" />
-            <circle cx="200" cy="85" r="2" fill="#92cfc6" opacity="0.2" />
-            {isEfootball && (
-                <rect x="110" y="25" width="80" height="35" rx="3" stroke="#e5b186" strokeWidth="0.8" fill="none" opacity="0.15" />
-            )}
-        </svg>
-    )
-}
-
 const TrophyIcon = ({ className }) => (
     <svg viewBox="0 0 24 24" fill="none" className={className} stroke="currentColor" strokeWidth="1.5">
         <path d="M12 2v4M8 6h8M8 6s-2 2-2 5 2 5 2 5M16 6s2 2 2 5-2 5-2 5M8 16s2 3 4 3 4-3 4-3M12 19v3" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
 )
-
-const statusConfig = {
-    registration: { bg: 'bg-[#92cfc6]/20', text: 'text-[#5c8d85]', border: 'border-[#92cfc6]/40', label: 'Open' },
-    active: { bg: 'bg-[#da513f]/15', text: 'text-[#da513f]', border: 'border-[#da513f]/30', label: 'Live' },
-    completed: { bg: 'bg-[#957467]/15', text: 'text-[#957467]', border: 'border-[#957467]/25', label: 'Done' },
-    draft: { bg: 'bg-[#e5b186]/20', text: 'text-[#b8956a]', border: 'border-[#e5b186]/35', label: 'Draft' },
-}
-
-const formatLabels = {
-    round_robin: 'Round Robin',
-    free_for_all: 'Free For All',
-    single_elim: 'Single Elim',
-    single_elimination: 'Single Elim',
-    double_elim: 'Double Elim',
-    double_elimination: 'Double Elim',
-    group_knockout: 'Group + KO',
-    swiss: 'Swiss'
-}
-
-const typeEmoji = {
-    physical: '⚽',
-    efootball: '🎮',
-    futsal: '🏃'
-}
 
 export default function MyEvents() {
     const { user } = useAuth()
@@ -151,22 +101,7 @@ export default function MyEvents() {
             <div className="fixed inset-0 pointer-events-none opacity-[0.025]"
                 style={{ backgroundImage: 'radial-gradient(#da513f 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
 
-            {/* ─── Header ─── */}
-            <nav className="sticky top-0 z-50 bg-[#fefcf2]/90 backdrop-blur-md border-b border-[#e5b186]/30">
-                <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-lg bg-[#da513f]/10 border border-[#da513f]/20 flex items-center justify-center">
-                            <TrophyIcon className="w-4 h-4 text-[#da513f]" />
-                        </div>
-                        <span className="font-black text-[#5c3d2e] text-sm tracking-tight">My Arena</span>
-                    </div>
-                    <button onClick={() => navigate('/create')}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-[#da513f] hover:bg-[#c44836] text-white text-xs font-bold rounded-lg shadow-sm shadow-[#da513f]/20 active:scale-95 transition-all">
-                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
-                        New
-                    </button>
-                </div>
-            </nav>
+
 
             {/* ─── Hero ─── */}
             <div className="relative bg-gradient-to-b from-[#f5debe]/25 to-[#fefcf2]">
@@ -206,72 +141,7 @@ export default function MyEvents() {
                 )}
             </div>
 
-    
-        </div>
-    )
-}
 
-function TournamentCard({ t, user, onClick }) {
-    const status = statusConfig[t.status] || statusConfig.draft
-    const formatLabel = formatLabels[t.format] || t.format?.replace(/_/g, ' ') || 'Unknown'
-    const emoji = typeEmoji[t.tournament_type] || '⚽'
-
-    return (
-        <div
-            onClick={onClick}
-            className="group relative bg-white rounded-2xl border border-[#e5b186]/25 shadow-sm hover:shadow-lg hover:shadow-[#da513f]/5 hover:border-[#da513f]/20 active:scale-[0.98] transition-all cursor-pointer overflow-hidden flex flex-col"
-        >
-            {/* Sports Image Background */}
-            <div className="relative h-24 md:h-28 overflow-hidden bg-gradient-to-b from-[#f5debe]/20 to-[#fefcf2]">
-                <CardStadiumBg type={t.tournament_type} />
-                <div className="absolute inset-0 bg-gradient-to-t from-white via-transparent to-transparent" />
-
-                {/* Top row: Type emoji + Status */}
-                <div className="absolute top-2 left-2 right-2 flex items-start justify-between z-10">
-                    <span className="text-lg md:text-xl drop-shadow-sm">{emoji}</span>
-                    <span className={`text-[9px] md:text-[10px] font-bold px-1.5 py-0.5 rounded-full border backdrop-blur-sm ${status.bg} ${status.text} ${status.border}`}>
-                        {status.label}
-                    </span>
-                </div>
-
-                {/* Initial watermark */}
-                <div className="absolute bottom-1 right-2 text-4xl md:text-5xl font-black text-[#da513f]/[0.04] leading-none select-none">
-                    {t.name?.charAt(0)?.toUpperCase() || 'T'}
-                </div>
-            </div>
-
-            {/* Content */}
-            <div className="p-2.5 md:p-3 flex-1 flex flex-col">
-                <h3 className="font-bold text-[#5c3d2e] text-xs md:text-sm leading-tight line-clamp-2 group-hover:text-[#da513f] transition-colors mb-1">
-                    {t.name}
-                </h3>
-
-                <p className="text-[10px] md:text-xs text-[#957467] truncate mb-2">
-                    {t.organizer_name || 'You'}
-                </p>
-
-                {/* Meta tags */}
-                <div className="mt-auto flex items-center gap-1.5 flex-wrap">
-                    <span className="inline-flex items-center gap-0.5 text-[9px] md:text-[10px] font-bold text-[#957467] bg-[#fefcf2] px-1.5 py-0.5 rounded-md border border-[#e5b186]/20">
-                        <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
-                        {t.max_teams || '-'}
-                    </span>
-                    <span className="text-[9px] md:text-[10px] font-bold text-[#957467] bg-[#fefcf2] px-1.5 py-0.5 rounded-md border border-[#e5b186]/20 truncate max-w-[80px] md:max-w-none">
-                        {formatLabel}
-                    </span>
-                </div>
-
-                {/* Action strip */}
-                <div className="mt-2 pt-2 border-t border-[#e5b186]/10 flex items-center justify-between">
-                    <span className="text-[9px] font-bold text-[#957467] uppercase tracking-wider">
-                        {t.tournament_type === 'efootball' ? 'eFootball' : t.tournament_type === 'futsal' ? 'Futsal' : 'Football'}
-                    </span>
-                    <span className="text-[10px] md:text-xs font-bold text-[#da513f] flex items-center gap-0.5 group-hover:gap-1 transition-all">
-                        Manage
-                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
-                    </span>
-                </div>
-            </div>
         </div>
     )
 }
