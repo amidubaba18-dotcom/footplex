@@ -120,15 +120,19 @@ const KNOCKOUT_MATCH_TYPES = new Set([
 // ─── CORS: LOCKED DOWN ────────────────────────────────────────────────────
 await app.register(cors, {
     origin: (origin, cb) => {
-        if (!origin) { cb(null, true); return }
-        if (ALLOWED_ORIGINS.includes(origin)) {
+        // Allow the request if it has no origin (like mobile apps/curl) 
+        // or if the origin is explicitly whitelisted or if all origins are allowed via '*'
+        if (!origin || ALLOWED_ORIGINS.includes(origin) || ALLOWED_ORIGINS.includes('*')) {
             cb(null, true)
         } else {
-            cb(new Error('CORS origin not allowed'), false)
+            // Passing 'false' instead of an Error object prevents a server-side crash/error response
+            // and allows the browser to handle the CORS rejection gracefully.
+            cb(null, false)
         }
     },
     credentials: true,
-    methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS']
+    methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
 })
 
 // ─── JWT: VALIDATED SECRET ──────────────────────────────────────────────────
